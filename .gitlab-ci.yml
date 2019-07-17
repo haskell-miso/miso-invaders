@@ -1,0 +1,12 @@
+pages:
+    image: nixos/nix
+    script:
+        - nix-build
+        - mkdir -p public
+        - cp result/bin/miso-invaders.jsexe/* public/
+    artifacts:
+        paths:
+            - public
+    only:
+        - master
+

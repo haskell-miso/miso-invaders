@@ -5,6 +5,7 @@ cabal-version:      >=1.10
 
 executable miso-invaders
     main-is:            Main.hs
+    hs-source-dirs:     src
     ghc-options:        -Wall -O
     ghcjs-options:      -dedupe
     build-depends:      base, miso
