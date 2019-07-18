@@ -1,5 +1,5 @@
 pages:
-    image: nixos/nix
+    image: juliendehos/miso-invaders
     script:
         - nix-build
         - mkdir -p public
