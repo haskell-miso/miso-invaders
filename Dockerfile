@@ -1,8 +1,9 @@
 FROM nixos/nix
 
-RUN nix-channel --add https://nixos.org/channels/nixos-19.03 nixpkgs
-RUN nix-channel --update
 RUN nix-env -iA nixpkgs.cabal-install
+
+#RUN nix-env -iA cachix -f https://cachix.org/api/v1/install
+#RUN cachix use haskell-miso
 
 COPY . /tmp/miso-invaders
 WORKDIR /tmp/miso-invaders
