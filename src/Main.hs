@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import Control.Monad (when)
 import qualified Data.Set as S
 import Data.Map (singleton)
 import JavaScript.Web.Canvas
@@ -12,19 +13,22 @@ import Miso.String hiding (singleton)
 instance Eq Image
 
 data Model = Model
-    { _val :: Int
-    , _paddle :: Image
+    { _canFire :: Bool
+    , _paddleImg :: Image
+    , _paddleX :: Double
+    , _paddleY :: Double
+    , _keys :: S.Set Int
     } deriving (Eq)
 
 data Action
     = ActionNone
-    | ActionPlay
+    | ActionKey (S.Set Int)
     deriving (Show, Eq)
 
-hKeys :: S.Set Int -> Action
-hKeys s = if S.member 37 s then ActionPlay else ActionNone
-
--- 37 left arrow ( x = -1 ) 38 up arrow ( y = 1 ) 39 right arrow ( x = 1 ) 40 down arrow ( y = -1 )
+-- 37 left arrow ( x = -1 )
+-- 38 up arrow ( y = 1 )
+-- 39 right arrow ( x = 1 )
+-- 40 down arrow ( y = -1 )
 
 main :: IO ()
 main = do
@@ -32,25 +36,25 @@ main = do
     jsSetSrc bobImg "spongebob-small.png"
     startApp App
         { initialAction = ActionNone
-        , model         = Model 0 bobImg
+        , model         = Model True bobImg 300 350 S.empty
         , update        = updateModel
         , view          = viewModel
         , events        = defaultEvents
-        , subs          = [ keyboardSub hKeys ]
+        , subs          = [ keyboardSub ActionKey ]
         , mountPoint    = Nothing
         }
 
 updateModel :: Action -> Model -> Effect Action Model
 updateModel ActionNone m = noEff m
-updateModel ActionPlay m = m <# do
-    jsPlayAudio
+updateModel (ActionKey ks) m = m <# do
+    when (S.member 32 ks && _canFire m) jsPlayAudio
     myCtx <- jsGetCtx
     clearRect 0 0 600 400 myCtx
-    jsDrawImage (_paddle m) 200 100 myCtx
+    jsDrawImage (_paddleImg m) (_paddleX m) (_paddleY m) myCtx
     pure ActionNone
 
 viewModel :: Model -> View Action
-viewModel m = div_ []
+viewModel _ = div_ []
     [ h1_ [] [ text "miso-invaders" ]
     , p_ [] [ audio_ [ id_ "myaudio", src_ "47.mp3" ] [] ]
     , p_ [] [ canvas_ [ id_ "mycanvas" , width_ "600" , height_ "400"
