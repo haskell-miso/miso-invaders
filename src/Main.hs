@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import qualified Data.Set as S
 import Data.Map (singleton)
 import JavaScript.Web.Canvas
 import Miso
@@ -7,15 +8,6 @@ import Miso.String hiding (singleton)
 
 -- https://github.com/Lermex/miso-plane/blob/master/src/Update.hs
 -- https://github.com/dmjio/miso/blob/master/examples/canvas2d/Main.hs
-
-{-
-hKeys :: KeyCode -> Action
-hKeys (KeyCode 37) = ActionPlay
-hKeys _ = ActionNone
--- 37 left arrow ( x = -1 ) 38 up arrow ( y = 1 ) 39 right arrow ( x = 1 ) 40 down arrow ( y = -1 )
--}
-
--- https://haddocks.haskell-miso.org/Miso-Subscription-Keyboard.html
 
 instance Eq Image
 
@@ -29,6 +21,11 @@ data Action
     | ActionPlay
     deriving (Show, Eq)
 
+hKeys :: S.Set Int -> Action
+hKeys s = if S.member 37 s then ActionPlay else ActionNone
+
+-- 37 left arrow ( x = -1 ) 38 up arrow ( y = 1 ) 39 right arrow ( x = 1 ) 40 down arrow ( y = -1 )
+
 main :: IO ()
 main = do
     bobImg <- jsNewImage
@@ -39,7 +36,7 @@ main = do
         , update        = updateModel
         , view          = viewModel
         , events        = defaultEvents
-        , subs          = []
+        , subs          = [ keyboardSub hKeys ]
         , mountPoint    = Nothing
         }
 
