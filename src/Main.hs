@@ -3,10 +3,12 @@
 import Miso
 import Miso.String
 
--- TODO test audio
--- TODO test image
 -- TODO test animation
 -- TODO implement game
+
+-- https://github.com/Lermex/miso-plane/blob/master/src/Update.hs
+-- http://hackage.haskell.org/package/miso-1.2.0.0/docs/Miso-Html-Element.html
+-- https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio
 
 data Model = Model
     { _val :: Int
@@ -35,8 +37,8 @@ updateModel NoOp m = noEff m
 viewModel :: Model -> View Action
 viewModel m = div_ []
     [ h1_ [] [ text "miso-invaders" ]
-    , text (ms $ _val m)
-    , button_ [ onClick AddOne ] [ text "+" ]
-    , img_ [ src_ "spongebob-small.png" ]
+    , p_ [] [ text (ms $ _val m), button_ [ onClick AddOne ] [ text "+" ] ]
+    , p_ [] [ img_ [ src_ "spongebob-small.png" ] ]
+    , p_ [] [ audio_ [ src_ "47.mp3", controls_ True ] [] ]
     ]
 
