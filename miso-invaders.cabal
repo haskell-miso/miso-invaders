@@ -8,6 +8,6 @@ executable miso-invaders
     hs-source-dirs:     src
     ghc-options:        -Wall -O
     ghcjs-options:      -dedupe
-    build-depends:      base, containers, miso
+    build-depends:      base, containers, ghcjs-base, miso
     default-language:   Haskell2010
 
