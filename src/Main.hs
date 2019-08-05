@@ -36,7 +36,7 @@ main = do
     jsSetSrc bobImg "spongebob-small.png"
     startApp App
         { initialAction = ActionNone
-        , model         = Model True bobImg 300 350 S.empty
+        , model         = Model True bobImg 300 330 S.empty
         , update        = updateModel
         , view          = viewModel
         , events        = defaultEvents
@@ -46,12 +46,15 @@ main = do
 
 updateModel :: Action -> Model -> Effect Action Model
 updateModel ActionNone m = noEff m
-updateModel (ActionKey ks) m = m <# do
+updateModel (ActionKey ks) m = m  <# do
     when (S.member 32 ks && _canFire m) jsPlayAudio
     myCtx <- jsGetCtx
     clearRect 0 0 600 400 myCtx
-    jsDrawImage (_paddleImg m) (_paddleX m) (_paddleY m) myCtx
+    jsDrawImage (_paddleImg m) x' (_paddleY m) myCtx
     pure ActionNone
+    where dx1 = if S.member 37 ks then (-20) else 0
+          dx2 = if S.member 39 ks then 20 else 0
+          x' = _paddleX m + dx1 + dx2
 
 viewModel :: Model -> View Action
 viewModel _ = div_ []
