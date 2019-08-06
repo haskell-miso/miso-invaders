@@ -1,27 +1,98 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Game
+import qualified Game as G
+
+import qualified JavaScript.Web.Canvas as JSC
+
+import Data.Map (singleton)
+import Miso
+import Miso.String hiding (singleton)
+import System.Random (newStdGen, randoms)
+
+data Model = Model
+    { _game :: G.Game
+    , _x :: Double
+    , _y :: Double
+    } deriving (Eq)
+
+data Action
+    = ActionNone
+    | ActionGetTime
+    | ActionSetTime
+
+main :: IO ()
+main = do
+    bobImg <- jsNewImage
+    jsSetSrc bobImg "spongebob-small.png"
+    myRands <- randoms <$> newStdGen
+    let game0 = G.createGame (Prelude.take 100 myRands :: [Double])
+    -- let game0 = G.createGame [1..4]
+    -- let game0 = G.Item (0,0) (0,0) (0,0) 
+    startApp App 
+        { initialAction = ActionGetTime
+        , update        = updateModel bobImg
+        , view          = viewModel
+        , model         = Model game0 100 300
+        , subs          = []
+        , events        = defaultEvents
+        , mountPoint    = Nothing
+        }
+
+viewModel :: Model -> View Action
+viewModel _ = div_ []
+    [ h1_ [] [ text "miso-invaders" ]
+    , p_ [] [ audio_ [ id_ "myaudio", src_ "47.mp3" ] [] ]
+    , p_ [] [ canvas_ [ id_ "mycanvas" , width_ (ms G.gameWidth), height_ (ms G.gameHeight)
+                      , style_  (singleton "border" "1px solid black")
+                      ] []
+            ]
+    , p_ [] 
+         [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"] [ text "source code" ]
+         , text " / "
+         , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"] [ text "demo" ]
+         ]
+    ]
+
+updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
+updateModel _ ActionNone m = noEff m
+updateModel _ ActionGetTime (Model g x y) = Model g (if x > 400 then 100 else x + 1) y <# pure ActionSetTime
+-- updateModel _ ActionGetTime m = m { _x = x' } <# pure ActionSetTime
+--     where x = _x m
+--           x' = if x > 400 then 100 else x + 1
+updateModel img ActionSetTime m = m <# do
+    ctx <- jsGetCtx
+    JSC.clearRect 0 0 G.gameWidth G.gameHeight ctx
+    -- jsDrawImage img (_x m) 200 ctx
+    jsDrawImage img (_x m) (_y m) ctx
+    pure ActionGetTime
+
+foreign import javascript unsafe "$r = new Image();"
+    jsNewImage :: IO JSC.Image
+
+foreign import javascript unsafe "$1.src = $2;"
+    jsSetSrc :: JSC.Image -> MisoString -> IO ()
+
+foreign import javascript unsafe "$r = mycanvas.getContext('2d');"
+    jsGetCtx :: IO JSC.Context
+
+foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
+    jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
+
+
+
+
+{- 
 
 import qualified Data.Set as S
-import qualified JavaScript.Web.Canvas as JSC
 
 import Control.Monad (when)
 import Data.JSString (singleton)
 import GHCJS.Types (JSVal)
-import System.Random (newStdGen, randoms)
 
 import Miso
 import Miso.String hiding (singleton)
 
 -- https://github.com/Lermex/miso-plane/blob/master/src/Update.hs
-
-instance Eq JSC.Image
-
-data Model = Model
-    { _game :: Game
-    , _paddleImg :: JSC.Image
-    , _x :: Double
-    } deriving (Eq)
 
 data Action
     = ActionStopped MisoString
@@ -78,43 +149,16 @@ updateModel (ActionKey ks) m = m  <# do
           x' = _paddleX m + dx1 + dx2
 -}
 
-viewModel :: Model -> View Action
-viewModel _ = div_ []
-    [ h1_ [] [ text "miso-invaders" ]
-    , p_ [] [ audio_ [ id_ "myaudio", src_ "47.mp3" ] [] ]
-    , p_ [] [ canvas_ [ id_ "mycanvas" , width_ (ms gameWidth), height_ (ms gameHeight)
-                      , style_  (singleton "border" "1px solid black")
-                      ] []
-            ]
-    , p_ [] 
-         [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"] [ text "source code" ]
-         , text " / "
-         , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"] [ text "demo" ]
-         ]
-    ]
-
 updateCanvas :: Model -> IO ()
 updateCanvas m = do
     myCtx <- jsGetCtx
-    JSC.clearRect 0 0 gameWidth gameHeight myCtx
+    JSC.clearRect 0 0 G.gameWidth G.gameHeight myCtx
     -- let (x, y) = _pos $ _paddle $ _game m
     -- jsDrawImage (_paddleImg m) x y myCtx
     jsDrawImage (_paddleImg m) (_x m) 100 myCtx
 
 foreign import javascript unsafe "myaudio.play();"
     jsPlayAudio :: IO ()
-
-foreign import javascript unsafe "$r = mycanvas.getContext('2d');"
-    jsGetCtx :: IO JSC.Context
-
-foreign import javascript unsafe "$r = new Image();"
-    jsNewImage :: IO JSC.Image
-
-foreign import javascript unsafe "$1.src = $2;"
-    jsSetSrc :: JSC.Image -> MisoString -> IO ()
-
-foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
-    jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
 
 foreign import javascript unsafe "$r = new Date();"
     newDate :: IO JSVal
@@ -124,4 +168,6 @@ foreign import javascript unsafe "$r = $1.getMilliseconds() + 1000 * $1.getSecon
 
 foreign import javascript unsafe "console.log($1);"
     jsPrint :: MisoString -> IO ()
+
+-}
 

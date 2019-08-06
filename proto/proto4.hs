@@ -5,7 +5,11 @@ import JavaScript.Web.Canvas
 import Miso
 import Miso.String hiding (singleton)
 
-type Model = Double
+data Model = Model 
+    { _x :: Double
+    , _y :: Double
+    , _rands :: [Double]
+    } deriving (Eq)
 
 data Action
   = NoOp
@@ -22,7 +26,8 @@ main = do
     , view   = \_ -> canvas_ [ id_ "mycanvas" , width_ "300" , height_ "300"
                              , style_  (singleton "border" "1px solid black")
                              ] []
-    , model  = 100
+    , model  = Model 100 200 [1..]
+    -- , model  = Model 100 200 [1..1000]
     , subs   = []
     , events = defaultEvents
     , mountPoint = Nothing
@@ -30,11 +35,13 @@ main = do
 
 updateModel :: Image -> Action -> Model -> Effect Action Model
 updateModel _ NoOp m = noEff m
-updateModel _ GetTime m = (if m > 200 then 100 else m + 1) <# pure SetTime
+updateModel _ GetTime m = m { _x = x' } <# pure SetTime
+    where x = _x m
+          x' = if x > 200 then 100 else x + 1
 updateModel earth SetTime m = m <# do
   ctx <- getCtx
   clearRect 0 0 300 300 ctx
-  drawImageXY earth m 200 ctx
+  drawImageXY earth (_x m) (_y m) ctx
   pure GetTime
 
 foreign import javascript unsafe "$4.drawImage($1,$2,$3);"
