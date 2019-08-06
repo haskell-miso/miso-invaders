@@ -6,33 +6,29 @@ import qualified JavaScript.Web.Canvas as JSC
 
 import Data.Map (singleton)
 import Miso
-import Miso.String hiding (singleton)
+import Miso.String hiding (singleton, take)
 import System.Random (newStdGen, randoms)
 
 data Model = Model
     { _game :: G.Game
-    , _x :: Double
-    , _y :: Double
     } deriving (Eq)
 
 data Action
     = ActionNone
-    | ActionGetTime
-    | ActionSetTime
+    | ActionUpdate
 
 main :: IO ()
 main = do
     bobImg <- jsNewImage
     jsSetSrc bobImg "spongebob-small.png"
-    myRands <- randoms <$> newStdGen
-    let game0 = G.createGame (Prelude.take 100 myRands :: [Double])
-    -- let game0 = G.createGame [1..4]
-    -- let game0 = G.Item (0,0) (0,0) (0,0) 
+    -- myRands <- randoms <$> newStdGen
+    myRands <- take 1000 . randoms <$> newStdGen
+    let game0 = G.createGame myRands
     startApp App 
-        { initialAction = ActionGetTime
+        { initialAction = ActionUpdate
         , update        = updateModel bobImg
         , view          = viewModel
-        , model         = Model game0 100 300
+        , model         = Model game0
         , subs          = []
         , events        = defaultEvents
         , mountPoint    = Nothing
@@ -55,16 +51,18 @@ viewModel _ = div_ []
 
 updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 updateModel _ ActionNone m = noEff m
-updateModel _ ActionGetTime (Model g x y) = Model g (if x > 400 then 100 else x + 1) y <# pure ActionSetTime
--- updateModel _ ActionGetTime m = m { _x = x' } <# pure ActionSetTime
---     where x = _x m
---           x' = if x > 400 then 100 else x + 1
-updateModel img ActionSetTime m = m <# do
+updateModel img ActionUpdate m = m { _game = g' } <# do
     ctx <- jsGetCtx
     JSC.clearRect 0 0 G.gameWidth G.gameHeight ctx
-    -- jsDrawImage img (_x m) 200 ctx
-    jsDrawImage img (_x m) (_y m) ctx
-    pure ActionGetTime
+    jsDrawImage img x 100 ctx
+    -- jsDrawImage img x y ctx
+    pure ActionUpdate
+    where g = _game m
+          p = G._paddle g
+          (x, y) = G._pos p
+          x' = if x > G.gameWidth then 0 else x + 2
+          p' = p { G._pos = (x', y) }
+          g' = g { G._paddle = p' }
 
 foreign import javascript unsafe "$r = new Image();"
     jsNewImage :: IO JSC.Image
@@ -88,9 +86,6 @@ import qualified Data.Set as S
 import Control.Monad (when)
 import Data.JSString (singleton)
 import GHCJS.Types (JSVal)
-
-import Miso
-import Miso.String hiding (singleton)
 
 -- https://github.com/Lermex/miso-plane/blob/master/src/Update.hs
 
