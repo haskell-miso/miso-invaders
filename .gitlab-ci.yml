@@ -1,8 +1,7 @@
 pages:
     image: juliendehos/miso-invaders
     script:
-        - nix-build
-        - cp result/bin/miso-invaders.jsexe/* public/
+        - nix-shell --run make
     artifacts:
         paths:
             - public

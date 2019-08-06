@@ -1,42 +1,42 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Game
-
-import qualified Data.Set as S
-import qualified JavaScript.Web.Canvas as JSC
-
 import Control.Monad (when)
+import qualified Data.Set as S
 import Data.Map (singleton)
-import System.Random (newStdGen, randoms)
-
+import JavaScript.Web.Canvas
 import Miso
 import Miso.String hiding (singleton)
 
 -- https://github.com/Lermex/miso-plane/blob/master/src/Update.hs
 -- https://github.com/dmjio/miso/blob/master/examples/canvas2d/Main.hs
 
-instance Eq JSC.Image
+instance Eq Image
 
 data Model = Model
-    { _game :: Game
-    , _paddleImg :: JSC.Image
+    { _canFire :: Bool
+    , _paddleImg :: Image
+    , _paddleX :: Double
+    , _paddleY :: Double
+    , _keys :: S.Set Int
     } deriving (Eq)
 
 data Action
-    = ActionStopped MisoString
-    | ActionPlaying
+    = ActionNone
     | ActionKey (S.Set Int)
     deriving (Show, Eq)
+
+-- 37 left arrow ( x = -1 )
+-- 38 up arrow ( y = 1 )
+-- 39 right arrow ( x = 1 )
+-- 40 down arrow ( y = -1 )
 
 main :: IO ()
 main = do
     bobImg <- jsNewImage
     jsSetSrc bobImg "spongebob-small.png"
-    myRands <- randoms <$> newStdGen
-    let game0 = createGame (myRands :: [Double])
     startApp App
-        { initialAction = ActionStopped "welcome"
-        , model         = Model game0 bobImg
+        { initialAction = ActionNone
+        , model         = Model True bobImg 300 330 S.empty
         , update        = updateModel
         , view          = viewModel
         , events        = defaultEvents
@@ -45,13 +45,7 @@ main = do
         }
 
 updateModel :: Action -> Model -> Effect Action Model
-updateModel (ActionStopped msg) m = noEff m
-updateModel ActionPlaying m = noEff m
-updateModel (ActionKey ks) m = m <# do
-    updateCanvas m
-    return ActionPlaying
-
-{-
+updateModel ActionNone m = noEff m
 updateModel (ActionKey ks) m = m  <# do
     when (S.member 32 ks && _canFire m) jsPlayAudio
     myCtx <- jsGetCtx
@@ -61,13 +55,12 @@ updateModel (ActionKey ks) m = m  <# do
     where dx1 = if S.member 37 ks then (-20) else 0
           dx2 = if S.member 39 ks then 20 else 0
           x' = _paddleX m + dx1 + dx2
--}
 
 viewModel :: Model -> View Action
 viewModel _ = div_ []
     [ h1_ [] [ text "miso-invaders" ]
     , p_ [] [ audio_ [ id_ "myaudio", src_ "47.mp3" ] [] ]
-    , p_ [] [ canvas_ [ id_ "mycanvas" , width_ (ms gameWidth), height_ (ms gameHeight)
+    , p_ [] [ canvas_ [ id_ "mycanvas" , width_ "600" , height_ "400"
                       , style_  (singleton "border" "1px solid black")
                       ] []
             ]
@@ -78,27 +71,18 @@ viewModel _ = div_ []
          ]
     ]
 
-updateCanvas :: Model -> IO ()
-updateCanvas m = do
-    myCtx <- jsGetCtx
-    JSC.clearRect 0 0 gameWidth gameHeight myCtx
-    -- let (x, y) = _pos $ _paddle $ _game m
-    let (x, y) = (100, 100)
-    jsDrawImage (_paddleImg m) x y myCtx
-    
-
 foreign import javascript unsafe "myaudio.play();"
     jsPlayAudio :: IO ()
 
 foreign import javascript unsafe "$r = mycanvas.getContext('2d');"
-    jsGetCtx :: IO JSC.Context
+    jsGetCtx :: IO Context
 
 foreign import javascript unsafe "$r = new Image();"
-    jsNewImage :: IO JSC.Image
+    jsNewImage :: IO Image
 
 foreign import javascript unsafe "$1.src = $2;"
-    jsSetSrc :: JSC.Image -> MisoString -> IO ()
+    jsSetSrc :: Image -> MisoString -> IO ()
 
 foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
-    jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
+    jsDrawImage :: Image -> Double -> Double -> Context -> IO ()
 

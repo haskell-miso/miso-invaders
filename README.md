@@ -1,7 +1,7 @@
 # miso-invaders
 
 ```
-nix-shell -A env
+nix-shell
 make
 firefox public/index.html
 ```

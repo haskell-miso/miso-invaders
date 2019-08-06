@@ -7,7 +7,7 @@ RUN nix-env -iA nixpkgs.cabal-install
 
 COPY . /tmp/miso-invaders
 WORKDIR /tmp/miso-invaders
-RUN nix-shell -A env --run "echo done"
+RUN nix-shell --run "echo done"
 
 WORKDIR /root
 
