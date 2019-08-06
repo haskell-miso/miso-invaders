@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Data.Map (singleton)
-import GHCJS.Types
 import JavaScript.Web.Canvas
 import Miso
 import Miso.String hiding (singleton)
@@ -31,15 +30,14 @@ main = do
 
 updateModel :: Image -> Action -> Model -> Effect Action Model
 updateModel _ NoOp m = noEff m
-updateModel _ GetTime m = m <# do
-  date <- newDate
-  m' <- getMillis date
+updateModel _ GetTime m = m' <# do
   pure $ SetTime m'
+  where m' = if m > 300 then 0 else m + 1
 updateModel earth (SetTime m) _ = m <# do
   ctx <- getCtx
   setGlobalCompositeOperation ctx
   clearRect 0 0 300 300 ctx
-  drawImageXY earth (0.1 * m) 200 ctx
+  drawImageXY earth m 200 ctx
   pure GetTime
 
 foreign import javascript unsafe "$1.globalCompositeOperation = 'destination-over';"
@@ -57,10 +55,5 @@ foreign import javascript unsafe "$r = new Image();"
 foreign import javascript unsafe "$1.src = $2;"
   setSrc :: Image -> MisoString -> IO ()
 
-foreign import javascript unsafe "$r = new Date();"
-  newDate :: IO JSVal
-
-foreign import javascript unsafe "$r = $1.getMilliseconds();"
-  getMillis :: JSVal -> IO Double
 
 
