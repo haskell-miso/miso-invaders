@@ -7,24 +7,26 @@ import qualified JavaScript.Web.Canvas as JSC
 
 import Control.Monad (when)
 import Data.Map (singleton)
+import GHCJS.Types (JSVal)
 import System.Random (newStdGen, randoms)
 
 import Miso
 import Miso.String hiding (singleton)
 
 -- https://github.com/Lermex/miso-plane/blob/master/src/Update.hs
--- https://github.com/dmjio/miso/blob/master/examples/canvas2d/Main.hs
 
 instance Eq JSC.Image
 
 data Model = Model
     { _game :: Game
     , _paddleImg :: JSC.Image
+    , _x :: Double
     } deriving (Eq)
 
 data Action
     = ActionStopped MisoString
-    | ActionPlaying
+    | ActionGetTime
+    | ActionSetTime Double
     | ActionKey (S.Set Int)
     deriving (Show, Eq)
 
@@ -36,7 +38,7 @@ main = do
     let game0 = createGame (myRands :: [Double])
     startApp App
         { initialAction = ActionStopped "welcome"
-        , model         = Model game0 bobImg
+        , model         = Model game0 bobImg 100
         , update        = updateModel
         , view          = viewModel
         , events        = defaultEvents
@@ -46,10 +48,23 @@ main = do
 
 updateModel :: Action -> Model -> Effect Action Model
 updateModel (ActionStopped msg) m = noEff m
-updateModel ActionPlaying m = noEff m
+updateModel ActionGetTime m = m <# do
+    date <- newDate
+    time <- getTime date
+    pure $ ActionSetTime time
+    -- pure $ ActionStopped ""
+updateModel (ActionSetTime time) m = m <# do
+    -- jsPrint $ ms time
+    -- updateCanvas m
+    pure $ ActionStopped ""
+    -- pure ActionGetTime
+
+-- updateModel (ActionKey ks) m = m { _x = 5 + _x m } <# do
 updateModel (ActionKey ks) m = m <# do
-    updateCanvas m
-    return ActionPlaying
+    jsPrint $ ms $ show ks
+    -- updateCanvas m
+    -- pure $ ActionStopped ""
+    pure ActionGetTime
 
 {-
 updateModel (ActionKey ks) m = m  <# do
@@ -83,9 +98,8 @@ updateCanvas m = do
     myCtx <- jsGetCtx
     JSC.clearRect 0 0 gameWidth gameHeight myCtx
     -- let (x, y) = _pos $ _paddle $ _game m
-    let (x, y) = (100, 100)
-    jsDrawImage (_paddleImg m) x y myCtx
-    
+    -- jsDrawImage (_paddleImg m) x y myCtx
+    jsDrawImage (_paddleImg m) (_x m) 100 myCtx
 
 foreign import javascript unsafe "myaudio.play();"
     jsPlayAudio :: IO ()
@@ -101,4 +115,13 @@ foreign import javascript unsafe "$1.src = $2;"
 
 foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
     jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
+
+foreign import javascript unsafe "$r = new Date();"
+    newDate :: IO JSVal
+
+foreign import javascript unsafe "$r = $1.getMilliseconds() + 1000 * $1.getSeconds();"
+    getTime :: JSVal -> IO Double
+
+foreign import javascript unsafe "console.log($1);"
+    jsPrint :: MisoString -> IO ()
 
