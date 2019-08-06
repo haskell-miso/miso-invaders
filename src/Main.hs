@@ -6,7 +6,7 @@ import qualified Data.Set as S
 import qualified JavaScript.Web.Canvas as JSC
 
 import Control.Monad (when)
-import Data.Map (singleton)
+import Data.JSString (singleton)
 import GHCJS.Types (JSVal)
 import System.Random (newStdGen, randoms)
 
