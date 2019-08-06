@@ -7,11 +7,6 @@ gameWidth, gameHeight :: Double
 gameWidth = 800
 gameHeight = 600
 
-paddleWidth, paddleHeight :: Double
--- TODO in game constructor ?
-paddleWidth = 70
-paddleHeight = 66
-
 data Status = Running | Won | Lost deriving (Eq)
 
 data Item = Item
@@ -32,9 +27,9 @@ data Game = Game
     , _invaders :: [Item]
     } deriving (Eq)
 
-createGame :: [Double] -> Game
-createGame rands0 = Game Running False False False rands1 0 myPaddle [] myInvaders
-    where myPaddle = Item (paddleWidth, paddleHeight) (0, -250) (0, 0)
+createGame :: [Double] -> Double -> Double -> Game
+createGame rands0 pw ph = Game Running False False False rands1 0 myPaddle [] myInvaders
+    where myPaddle = Item (pw, ph) (0, -250) (0, 0)
           ([mag, dir], rands1) = splitAt 2 rands0
           vx = (150 + 200 * mag) * (if dir < 0.5 then 1 else -1)
           myInvaders = [ Item (70, 20) 
@@ -128,5 +123,6 @@ step time g = if _status g == Running then mRunning else mEnd
                         $ updateInvaders time 
                         $ updateBullets time
                         $ updateCollisions g
-          mEnd = if _inputFire g then createGame (_rands g) else g
+          (pw, ph) = _siz $ _paddle g
+          mEnd = if _inputFire g then createGame (_rands g) pw ph else g
 

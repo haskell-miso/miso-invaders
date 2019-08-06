@@ -2,6 +2,7 @@
 
 import qualified Game as G
 
+import qualified Data.Set as S
 import qualified JavaScript.Web.Canvas as JSC
 
 import Data.Map (singleton)
@@ -9,27 +10,35 @@ import Miso
 import Miso.String hiding (singleton, take)
 import System.Random (newStdGen, randoms)
 
+paddleWidth, paddleHeight :: Double
+paddleWidth = 70
+paddleHeight = 66
+
+paddleImgName :: MisoString
+paddleImgName = "spongebob-small.png"
+
 data Model = Model
     { _game :: G.Game
     } deriving (Eq)
 
 data Action
     = ActionNone
-    | ActionUpdate
+    | ActionUpdate -- Double
+    | ActionKey (S.Set Int)
 
 main :: IO ()
 main = do
-    bobImg <- jsNewImage
-    jsSetSrc bobImg "spongebob-small.png"
+    paddleImg <- jsNewImage
+    jsSetSrc paddleImg paddleImgName
     -- myRands <- randoms <$> newStdGen
     myRands <- take 1000 . randoms <$> newStdGen
-    let game0 = G.createGame myRands
+    let game0 = G.createGame myRands paddleWidth paddleHeight
     startApp App 
-        { initialAction = ActionUpdate
-        , update        = updateModel bobImg
+        { initialAction = ActionNone
+        , update        = updateModel paddleImg
         , view          = viewModel
         , model         = Model game0
-        , subs          = []
+        , subs          = [ keyboardSub ActionKey ]
         , events        = defaultEvents
         , mountPoint    = Nothing
         }
@@ -56,13 +65,15 @@ updateModel img ActionUpdate m = m { _game = g' } <# do
     JSC.clearRect 0 0 G.gameWidth G.gameHeight ctx
     jsDrawImage img x 100 ctx
     -- jsDrawImage img x y ctx
-    pure ActionUpdate
+    pure ActionNone
     where g = _game m
           p = G._paddle g
           (x, y) = G._pos p
           x' = if x > G.gameWidth then 0 else x + 2
           p' = p { G._pos = (x', y) }
           g' = g { G._paddle = p' }
+updateModel _ (ActionKey ks) m = 
+    m <# (return $ if S.member 37 ks then ActionUpdate else ActionNone)
 
 foreign import javascript unsafe "$r = new Image();"
     jsNewImage :: IO JSC.Image
@@ -77,40 +88,13 @@ foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
     jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
 
 
-
-
 {- 
-
-import qualified Data.Set as S
 
 import Control.Monad (when)
 import Data.JSString (singleton)
 import GHCJS.Types (JSVal)
 
 -- https://github.com/Lermex/miso-plane/blob/master/src/Update.hs
-
-data Action
-    = ActionStopped MisoString
-    | ActionGetTime
-    | ActionSetTime Double
-    | ActionKey (S.Set Int)
-    deriving (Show, Eq)
-
-main :: IO ()
-main = do
-    bobImg <- jsNewImage
-    jsSetSrc bobImg "spongebob-small.png"
-    myRands <- randoms <$> newStdGen
-    let game0 = createGame (myRands :: [Double])
-    startApp App
-        { initialAction = ActionStopped "welcome"
-        , model         = Model game0 bobImg 100
-        , update        = updateModel
-        , view          = viewModel
-        , events        = defaultEvents
-        , subs          = [ keyboardSub ActionKey ]
-        , mountPoint    = Nothing
-        }
 
 updateModel :: Action -> Model -> Effect Action Model
 updateModel (ActionStopped msg) m = noEff m
