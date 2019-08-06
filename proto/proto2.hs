@@ -1,11 +1,7 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
 
-import Control.Monad
 import GHCJS.Types
 import JavaScript.Web.Canvas
-
 import Miso
 import Miso.String
 
@@ -20,25 +16,17 @@ main :: IO ()
 main = do
   sun <- newImage
   setSrc sun "https://mdn.mozillademos.org/files/1456/Canvas_sun.png"
-  startApp App { initialAction = GetTime
-               , update = updateModel sun
-               , ..
-               }
-  where
-    view _ = canvas_ [ id_ "canvas"
-                     , width_ "300"
-                     , height_ "300"
-                     ] []
-    model  = (0.0, 0.0)
-    subs   = []
-    events = defaultEvents
-    mountPoint = Nothing -- default to body
+  startApp App 
+    { initialAction = GetTime
+    , update = updateModel sun
+    , view   = \_ -> canvas_ [ id_ "canvas" , width_ "300" , height_ "300" ] []
+    , model  = (0.0, 0.0)
+    , subs   = []
+    , events = defaultEvents
+    , mountPoint = Nothing
+    }
 
-updateModel
-  :: Image
-  -> Action
-  -> Model
-  -> Effect Action Model
+updateModel :: Image -> Action -> Model -> Effect Action Model
 updateModel _ NoOp m = noEff m
 updateModel _ GetTime m = m <# do
   date <- newDate
@@ -55,7 +43,7 @@ foreign import javascript unsafe "$1.globalCompositeOperation = 'destination-ove
   setGlobalCompositeOperation :: Context -> IO ()
 
 foreign import javascript unsafe "$4.drawImage($1,$2,$3);"
-  drawImage' :: Image -> Double -> Double -> Context -> IO ()
+  drawImageXY :: Image -> Double -> Double -> Context -> IO ()
 
 foreign import javascript unsafe "$r = document.getElementById('canvas').getContext('2d');"
   getCtx :: IO Context
