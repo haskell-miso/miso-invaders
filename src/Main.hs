@@ -47,7 +47,7 @@ main :: IO ()
 main = do
     paddleImg <- jsNewImage
     jsSetSrc paddleImg paddleImgName
-    rands <- take 5000 . randoms <$> newStdGen
+    rands <- take 1000 . randoms <$> newStdGen
     time0 <- myGetTime
     let game0 = G.createGame rands paddleWidth paddleHeight
     startApp App
@@ -68,7 +68,7 @@ viewModel :: Model -> View Action
 viewModel _ = div_ []
     [ h1_ [] [ text "miso-invaders" ]
     , p_ [] [ audio_ [ id_ "myaudio", src_ "47.mp3" ] [] ]
-    , p_ [] [ "Press enter to start or reset the game..." ]
+    , p_ [] [ "Press enter to start..." ]
     , p_ [] [ canvas_ [ id_ "mycanvas"
                       , width_ (MS.ms G.gameWidth)
                       , height_ (MS.ms G.gameHeight)
