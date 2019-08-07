@@ -29,30 +29,37 @@ paddleHeight = 66
 paddleImgName :: MS.MisoString
 paddleImgName = "spongebob-small.png"
 
-newtype Model = Model
+data Model = Model
     { _game :: G.Game
+    , _time :: Double
     } deriving (Eq)
 
 data Action
     = ActionNone
-    | ActionUpdate -- Double
+    | ActionUpdate
+    | ActionStep Double
     | ActionKey (S.Set Int)
 
 ----------------------------------------------------------------------
--- main function
+-- main functions
 ----------------------------------------------------------------------
+
+myGetTime :: IO Double
+myGetTime = (* 0.001) <$> now
 
 main :: IO ()
 main = do
     paddleImg <- jsNewImage
     jsSetSrc paddleImg paddleImgName
     myRands <- randoms <$> newStdGen
+    -- myRands <- take 1000 . randoms <$> newStdGen
+    time0 <- myGetTime
     let game0 = G.createGame myRands paddleWidth paddleHeight
-    startApp App 
+    startApp App
         { initialAction = ActionUpdate
         , update        = updateModel paddleImg
         , view          = viewModel
-        , model         = Model game0
+        , model         = Model game0 time0
         , subs          = [ keyboardSub ActionKey ]
         , events        = defaultEvents
         , mountPoint    = Nothing
@@ -72,7 +79,7 @@ viewModel _ = div_ []
                       , style_  (singleton "border" "1px solid black")
                       ] []
             ]
-    , p_ [] 
+    , p_ []
          [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"]
               [ text "source code" ]
          , text " / "
@@ -111,7 +118,7 @@ drawText txt = do
     JSC.font "50px Arial" ctx
     JSC.fillText txt (G.gameWidthD/2) (G.gameHeightD/2) ctx
     JSC.stroke ctx
- 
+
 ----------------------------------------------------------------------
 -- update function
 ----------------------------------------------------------------------
@@ -120,20 +127,18 @@ updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 
 updateModel _ ActionNone m = noEff m
 
-updateModel paddleImg ActionUpdate m = m { _game = game' } <# 
-    case status of
+updateModel _ ActionUpdate m = m <#
+    case G._status (_game m) of
         G.Won -> drawText "You win !" >> pure ActionNone
         G.Lost -> drawText "Game over !" >> pure ActionNone
-        _ -> do
-            drawGame paddleImg game
-            pure ActionUpdate
-    where game = _game m
-          status = G._status game
-          game' = if status /= G.Running
-                    then game
-                    else G.step 0.01 game
+        _ -> ActionStep <$> myGetTime
 
-updateModel _ (ActionKey ks) m = 
+updateModel paddleImg (ActionStep t1) (Model game t0) = Model game' t1 <# do
+    drawGame paddleImg game'
+    pure ActionUpdate
+    where game' = G.step (t1 - t0) game
+
+updateModel _ (ActionKey ks) m =
     m <# return (if S.member 39 ks then ActionUpdate else ActionNone)
 
 ----------------------------------------------------------------------
@@ -151,4 +156,7 @@ foreign import javascript unsafe "$r = mycanvas.getContext('2d');"
 
 foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
     jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
+
+foreign import javascript unsafe "console.log($1);"
+    jsPrint :: MS.MisoString -> IO ()
 
