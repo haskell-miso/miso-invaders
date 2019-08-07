@@ -1,9 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- TODO keyboard events
--- TODO random numbers
 -- TODO audio
--- TODO step time
 -- TODO flip paddle ?
 
 -- http://hackage.haskell.org/package/ghcjs-base
@@ -32,11 +30,14 @@ paddleImgName = "spongebob-small.png"
 data Model = Model
     { _game :: G.Game
     , _time :: Double
+    , _inputLeft :: Bool
+    , _inputRight :: Bool
+    , _inputFire :: Bool
     } deriving (Eq)
 
 data Action
     = ActionNone
-    | ActionUpdate
+    | ActionDisplay
     | ActionStep Double
     | ActionKey (S.Set Int)
 
@@ -56,10 +57,10 @@ main = do
     time0 <- myGetTime
     let game0 = G.createGame myRands paddleWidth paddleHeight
     startApp App
-        { initialAction = ActionUpdate
+        { initialAction = ActionDisplay
         , update        = updateModel paddleImg
         , view          = viewModel
-        , model         = Model game0 time0
+        , model         = Model game0 time0 False False False
         , subs          = [ keyboardSub ActionKey ]
         , events        = defaultEvents
         , mountPoint    = Nothing
@@ -127,19 +128,21 @@ updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 
 updateModel _ ActionNone m = noEff m
 
-updateModel _ ActionUpdate m = m <#
+updateModel _ ActionDisplay m = m <#
     case G._status (_game m) of
         G.Won -> drawText "You win !" >> pure ActionNone
         G.Lost -> drawText "Game over !" >> pure ActionNone
         _ -> ActionStep <$> myGetTime
 
-updateModel paddleImg (ActionStep t1) (Model game t0) = Model game' t1 <# do
+updateModel paddleImg (ActionStep t1) m = m' <# do
     drawGame paddleImg game'
-    pure ActionUpdate
-    where game' = G.step (t1 - t0) game
+    pure ActionDisplay
+    where t0 = _time m
+          game' = G.step (t1 - t0) (_game m)
+          m' = m { _game = game', _time = t1 }
 
 updateModel _ (ActionKey ks) m =
-    m <# return (if S.member 39 ks then ActionUpdate else ActionNone)
+    m <# return (if S.member 39 ks then ActionDisplay else ActionNone)
 
 ----------------------------------------------------------------------
 -- JavaScript FFI
@@ -156,7 +159,4 @@ foreign import javascript unsafe "$r = mycanvas.getContext('2d');"
 
 foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
     jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
-
-foreign import javascript unsafe "console.log($1);"
-    jsPrint :: MS.MisoString -> IO ()
 
