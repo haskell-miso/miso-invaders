@@ -13,4 +13,3 @@ executable miso-invaders
     ghcjs-options:      -dedupe
     cpp-options:        -DGHCJS_BROWSER
 
-
