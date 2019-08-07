@@ -1,7 +1,8 @@
 pages:
     image: juliendehos/miso-invaders
     script:
-        - nix-shell --run make
+        - nix-shell --run "cabal --http-transport=plain-http build"
+        - cp dist/build/miso-invaders/miso-invaders.jsexe/all.js public/
     artifacts:
         paths:
             - public
