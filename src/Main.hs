@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- TODO audio
--- TODO random
 
 import qualified Game as G
 
@@ -27,10 +26,12 @@ paddleImgName = "spongebob-small.png"
 data Model = Model
     { _game :: G.Game
     , _time :: Double
+    , _rands :: [Double]
     } deriving (Eq)
 
 data Action
     = ActionNone
+    | ActionReset
     | ActionDisplay
     | ActionStep Double
     | ActionKey (S.Set Int)
@@ -46,14 +47,14 @@ main :: IO ()
 main = do
     paddleImg <- jsNewImage
     jsSetSrc paddleImg paddleImgName
-    myRands <- take 10000 . randoms <$> newStdGen
+    rands <- take 5000 . randoms <$> newStdGen
     time0 <- myGetTime
-    let game0 = G.createGame myRands paddleWidth paddleHeight
+    let game0 = G.createGame rands paddleWidth paddleHeight
     startApp App
-        { initialAction = ActionDisplay
+        { initialAction = ActionNone
         , update        = updateModel paddleImg
         , view          = viewModel
-        , model         = Model game0 time0
+        , model         = Model game0 time0 rands
         , subs          = [ keyboardSub ActionKey ]
         , events        = defaultEvents
         , mountPoint    = Nothing
@@ -67,6 +68,7 @@ viewModel :: Model -> View Action
 viewModel _ = div_ []
     [ h1_ [] [ text "miso-invaders" ]
     , p_ [] [ audio_ [ id_ "myaudio", src_ "47.mp3" ] [] ]
+    , p_ [] [ "Press enter to start or reset the game..." ]
     , p_ [] [ canvas_ [ id_ "mycanvas"
                       , width_ (MS.ms G.gameWidth)
                       , height_ (MS.ms G.gameHeight)
@@ -110,8 +112,8 @@ drawText txt = do
     JSC.clearRect 0 0 G.gameWidthD G.gameHeightD ctx
     JSC.fillStyle 0 0 0 255 ctx
     JSC.textAlign JSC.Center ctx
-    JSC.font "50px Arial" ctx
-    JSC.fillText txt (G.gameWidthD/2) (G.gameHeightD/2) ctx
+    JSC.font "40px Arial" ctx
+    JSC.fillText txt (0.5*G.gameWidthD) (0.5*G.gameHeightD) ctx
     JSC.stroke ctx
 
 ----------------------------------------------------------------------
@@ -121,6 +123,11 @@ drawText txt = do
 updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 
 updateModel _ ActionNone m = noEff m
+
+updateModel _ ActionReset m = m' <# pure ActionDisplay
+    where rands' = G.doCycle 1 (_rands m)
+          game' = G.createGame rands' paddleWidth paddleHeight
+          m' = m { _game = game', _rands = rands' }
 
 updateModel _ ActionDisplay m = m <#
     case G._status (_game m) of
@@ -137,12 +144,14 @@ updateModel paddleImg (ActionStep t1) m = m' <# do
           game' = G.step dt game
           m' = m { _game = game', _time = t1 }
 
-updateModel _ (ActionKey ks) m = m { _game = game' } <# pure ActionDisplay -- TODO
-    where game' = (_game m) 
-                    { G._inputLeft = S.member 37 ks
-                    , G._inputRight = S.member 39 ks
-                    , G._inputFire = S.member 32 ks
-                    }
+updateModel _ (ActionKey ks) m = 
+    if S.member 13 ks 
+    then m <# (jsConsoleLog "new game" >> pure ActionReset)
+    else noEff m { _game = (_game m) { G._inputLeft = S.member 37 ks
+                                     , G._inputRight = S.member 39 ks
+                                     , G._inputFire = S.member 32 ks
+                                     }
+                 }
 
 ----------------------------------------------------------------------
 -- JavaScript FFI

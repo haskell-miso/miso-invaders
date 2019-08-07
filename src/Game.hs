@@ -31,10 +31,16 @@ data Game = Game
     , _invaders :: [Item]
     } deriving (Eq)
 
+doCycle :: Int -> [a] -> [a]
+doCycle n xs = let (xs0, xs1) = splitAt n xs in xs1++xs0
+
+getCycle :: Int -> [a] -> ([a], [a])
+getCycle n xs = let (xs0, xs1) = splitAt n xs in (xs0, xs1++xs0)
+
 createGame :: [Double] -> Double -> Double -> Game
 createGame rands0 pw ph = Game Running False False False rands1 0 myPaddle [] myInvaders
     where myPaddle = Item (pw, ph) (gameWidthD/2, gameHeightD - ph) (0, 0)
-          ([mag, dir], rands1) = splitAt 2 rands0
+          ([mag, dir], rands1) = getCycle 2 rands0
           vx = (150 + 200 * mag) * (if dir < 0.5 then 1 else -1)
           myInvaders = [ Item (70, 20) 
                               (fromIntegral x * 100 + gameWidthD/2, fromIntegral y * 50 + 20)
@@ -82,11 +88,11 @@ fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
     where invadersPos = map _pos $ _invaders g
           fInsert pMap (x,y) = M.insertWith max x y pMap
           fighters0 = M.toList $ foldl fInsert M.empty invadersPos
-          (rands0, rands1) = splitAt (length fighters0) (_rands g)
-          (rands2, rands3) = splitAt (length fighters0) rands1
+          (rands0, rands1) = getCycle (length fighters0) (_rands g)
+          (rands2, rands3) = getCycle (length fighters0) rands1
           difficulty = 0.9 + fromIntegral (length invadersPos) * (0.99 - 0.9) / 15
           fighters1 = [ (p, v) | (p, r, v) <- zip3 fighters0 rands0 rands2, r > difficulty ]
-          createBullet ((x, y), v) = Item (3, 9) (x, y+20) (0, (300+v*200))
+          createBullet ((x, y), v) = Item (3, 9) (x, y+20) (0, 300+v*200)
           bs = map createBullet fighters1
 
 autoUpdateItem :: Double -> Item -> Item
@@ -124,11 +130,10 @@ runCollisions (b:bs) is = (bs1++bs2, is2)
           (bs2, is2) = runCollisions bs is1
 
 step :: Double -> Game -> Game
-step time g = if _status g == Running then mRunning else mEnd
-    where mRunning = updatePaddle time
-                        $ updateInvaders time 
-                        $ updateBullets time
-                        $ updateCollisions g
-          (pw, ph) = _siz $ _paddle g
-          mEnd = if _inputFire g then createGame (_rands g) pw ph else g
+step time g = 
+    if _status g /= Running then g 
+    else updatePaddle time
+            $ updateInvaders time 
+            $ updateBullets time
+            $ updateCollisions g
 
