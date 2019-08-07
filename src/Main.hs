@@ -1,13 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- TODO audio
-
 import qualified Game as G
 
 import qualified Data.Set as S
 import qualified JavaScript.Web.Canvas as JSC
 import qualified Miso.String as MS
 
+import Control.Monad (when)
 import Data.Map (singleton)
 import Miso
 import System.Random (newStdGen, randoms)
@@ -32,7 +31,7 @@ data Model = Model
 data Action
     = ActionNone
     | ActionReset
-    | ActionDisplay
+    | ActionDisplay Bool
     | ActionStep Double
     | ActionKey (S.Set Int)
 
@@ -67,7 +66,7 @@ main = do
 viewModel :: Model -> View Action
 viewModel _ = div_ []
     [ h1_ [] [ text "miso-invaders" ]
-    , p_ [] [ audio_ [ id_ "myaudio", src_ "47.mp3" ] [] ]
+    , p_ [] [ audio_ [ id_ "myaudio", src_ "laugh.mp3" ] [] ]
     , p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
     , p_ [] [ canvas_ [ id_ "mycanvas"
                       , width_ (MS.ms G.gameWidth)
@@ -124,24 +123,24 @@ updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 
 updateModel _ ActionNone m = noEff m
 
-updateModel _ ActionReset m = m' <# pure ActionDisplay
+updateModel _ ActionReset m = m' <# pure (ActionDisplay False)
     where rands' = G.doCycle 1 (_rands m)
           game' = G.createGame rands' paddleWidth paddleHeight
           m' = m { _game = game', _rands = rands' }
 
-updateModel _ ActionDisplay m = m <#
-    case G._status (_game m) of
-        G.Won -> drawText "You win !" >> pure ActionNone
-        G.Lost -> drawText "Game over !" >> pure ActionNone
-        _ -> ActionStep <$> myGetTime
+updateModel _ (ActionDisplay hasShoot) m = m <# case G._status (_game m) of
+    G.Won -> drawText "You win !" >> pure ActionNone
+    G.Lost -> drawText "Game over !" >> pure ActionNone
+    _ -> when hasShoot jsPlayAudio >> ActionStep <$> myGetTime
 
 updateModel paddleImg (ActionStep t1) m = m' <# do
     drawGame paddleImg game
-    pure ActionDisplay
+    pure (ActionDisplay hasShoot)
     where t0 = _time m
           dt = t1 - t0
           game = _game m
           game' = G.step dt game
+          hasShoot = length (G._invaders game') < length (G._invaders game)
           m' = m { _game = game', _time = t1 }
 
 updateModel _ (ActionKey ks) m = 
@@ -171,4 +170,7 @@ foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
 
 foreign import javascript unsafe "console.log($1);"
     jsConsoleLog :: MS.MisoString -> IO ()
+
+foreign import javascript unsafe "myaudio.play();"
+    jsPlayAudio :: IO ()
 
