@@ -89,16 +89,21 @@ drawItem ctx (G.Item (sx, sy) (px, py) _) = JSC.fillRect px py sx sy ctx
 
 drawGame :: JSC.Image -> G.Game -> IO ()
 drawGame paddleImg game = do
+    -- initialize drawing
     ctx <- jsGetCtx
     JSC.clearRect 0 0 G.gameWidthD G.gameHeightD ctx
     JSC.lineWidth 0 ctx
+    -- draw bullets
+    JSC.fillStyle 0 0 255 255 ctx
+    mapM_ (drawItem ctx) (G._bullets game)
+    -- draw invaders
     JSC.fillStyle 255 0 0 255 ctx
-    mapM_ (drawItem ctx) invaders
+    mapM_ (drawItem ctx) (G._invaders game)
     JSC.stroke ctx
+    -- draw paddle
     jsDrawImage paddleImg x y ctx
     where paddle = G._paddle game
           (x, y) = G._pos paddle
-          invaders = G._invaders game
 
 ----------------------------------------------------------------------
 -- update function
