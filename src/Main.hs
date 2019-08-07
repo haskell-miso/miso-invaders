@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- TODO display game
 -- TODO keyboard events
 -- TODO game over
 -- TODO random numbers
@@ -105,6 +104,15 @@ drawGame paddleImg game = do
     where paddle = G._paddle game
           (x, y) = G._pos paddle
 
+drawText :: MS.JSString -> IO ()
+drawText txt = do
+    ctx <- jsGetCtx
+    JSC.clearRect 0 0 G.gameWidthD G.gameHeightD ctx
+    JSC.textAlign JSC.Center ctx
+    JSC.font "50px Arial" ctx
+    JSC.fillText txt (G.gameWidthD/2) (G.gameHeightD/2) ctx
+    JSC.stroke ctx
+ 
 ----------------------------------------------------------------------
 -- update function
 ----------------------------------------------------------------------
@@ -113,15 +121,18 @@ updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 
 updateModel _ ActionNone m = noEff m
 
-updateModel paddleImg ActionUpdate m = m { _game = g' } <# do
-    drawGame paddleImg g
+updateModel paddleImg ActionUpdate m = m { _game = game' } <# do
+    case G._status game of
+        G.Won -> drawText "You win !"
+        G.Lost -> drawText "Game over !"
+        _ -> drawGame paddleImg game
     pure ActionNone
-    where g = _game m
-          p = G._paddle g
-          (x, y) = G._pos p
+    where game = _game m
+          paddle = G._paddle game
+          (x, y) = G._pos paddle
           x' = if x > G.gameWidthD then 0 else x + 2
-          p' = p { G._pos = (x', y) }
-          g' = g { G._paddle = p' }
+          paddle' = paddle { G._pos = (x', y) }
+          game' = game { G._paddle = paddle' }
 
 updateModel _ (ActionKey ks) m = 
     m <# return (if S.member 39 ks then ActionUpdate else ActionNone)
