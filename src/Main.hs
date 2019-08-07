@@ -62,18 +62,18 @@ updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 updateModel _ ActionNone m = noEff m
 updateModel img ActionUpdate m = m { _game = g' } <# do
     ctx <- jsGetCtx
-    JSC.clearRect 0 0 G.gameWidth G.gameHeight ctx
+    JSC.clearRect 0 0 G.gameWidthD G.gameHeightD ctx
     jsDrawImage img x 100 ctx
     -- jsDrawImage img x y ctx
     pure ActionNone
     where g = _game m
           p = G._paddle g
           (x, y) = G._pos p
-          x' = if x > G.gameWidth then 0 else x + 2
+          x' = if x > G.gameWidthD then 0 else x + 2
           p' = p { G._pos = (x', y) }
           g' = g { G._paddle = p' }
 updateModel _ (ActionKey ks) m = 
-    m <# (return $ if S.member 37 ks then ActionUpdate else ActionNone)
+    m <# return (if S.member 37 ks then ActionUpdate else ActionNone)
 
 foreign import javascript unsafe "$r = new Image();"
     jsNewImage :: IO JSC.Image
