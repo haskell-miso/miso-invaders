@@ -33,7 +33,7 @@ data Game = Game
 
 createGame :: [Double] -> Double -> Double -> Game
 createGame rands0 pw ph = Game Running False False False rands1 0 myPaddle [] myInvaders
-    where myPaddle = Item (pw, ph) (gameWidthD/2, gameHeightD - 30) (0, 0)
+    where myPaddle = Item (pw, ph) (gameWidthD/2, gameHeightD - ph) (0, 0)
           ([mag, dir], rands1) = splitAt 2 rands0
           vx = (150 + 200 * mag) * (if dir < 0.5 then 1 else -1)
           myInvaders = [ Item (70, 20) 
