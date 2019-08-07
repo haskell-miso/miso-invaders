@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- TODO keyboard events
--- TODO game over
 -- TODO random numbers
 -- TODO audio
 -- TODO step time
@@ -47,8 +46,7 @@ main :: IO ()
 main = do
     paddleImg <- jsNewImage
     jsSetSrc paddleImg paddleImgName
-    -- myRands <- randoms <$> newStdGen
-    myRands <- take 1000 . randoms <$> newStdGen
+    myRands <- randoms <$> newStdGen
     let game0 = G.createGame myRands paddleWidth paddleHeight
     startApp App 
         { initialAction = ActionUpdate
@@ -108,6 +106,7 @@ drawText :: MS.JSString -> IO ()
 drawText txt = do
     ctx <- jsGetCtx
     JSC.clearRect 0 0 G.gameWidthD G.gameHeightD ctx
+    JSC.fillStyle 0 0 0 255 ctx
     JSC.textAlign JSC.Center ctx
     JSC.font "50px Arial" ctx
     JSC.fillText txt (G.gameWidthD/2) (G.gameHeightD/2) ctx
@@ -121,18 +120,18 @@ updateModel :: JSC.Image -> Action -> Model -> Effect Action Model
 
 updateModel _ ActionNone m = noEff m
 
-updateModel paddleImg ActionUpdate m = m { _game = game' } <# do
-    case G._status game of
-        G.Won -> drawText "You win !"
-        G.Lost -> drawText "Game over !"
-        _ -> drawGame paddleImg game
-    pure ActionNone
+updateModel paddleImg ActionUpdate m = m { _game = game' } <# 
+    case status of
+        G.Won -> drawText "You win !" >> pure ActionNone
+        G.Lost -> drawText "Game over !" >> pure ActionNone
+        _ -> do
+            drawGame paddleImg game
+            pure ActionUpdate
     where game = _game m
-          paddle = G._paddle game
-          (x, y) = G._pos paddle
-          x' = if x > G.gameWidthD then 0 else x + 2
-          paddle' = paddle { G._pos = (x', y) }
-          game' = game { G._paddle = paddle' }
+          status = G._status game
+          game' = if status /= G.Running
+                    then game
+                    else G.step 0.01 game
 
 updateModel _ (ActionKey ks) m = 
     m <# return (if S.member 39 ks then ActionUpdate else ActionNone)
