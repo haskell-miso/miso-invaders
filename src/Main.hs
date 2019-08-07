@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- TODO audio
--- TODO flip paddle ?
+-- TODO random
 
 import qualified Game as G
 
@@ -46,12 +46,11 @@ main :: IO ()
 main = do
     paddleImg <- jsNewImage
     jsSetSrc paddleImg paddleImgName
-    -- myRands <- randoms <$> newStdGen
-    myRands <- take 10000 . randoms <$> newStdGen  -- TODO
+    myRands <- take 10000 . randoms <$> newStdGen
     time0 <- myGetTime
     let game0 = G.createGame myRands paddleWidth paddleHeight
     startApp App
-        { initialAction = ActionNone  -- TODO
+        { initialAction = ActionDisplay
         , update        = updateModel paddleImg
         , view          = viewModel
         , model         = Model game0 time0
