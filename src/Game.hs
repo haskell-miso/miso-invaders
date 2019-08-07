@@ -56,7 +56,7 @@ firePaddleBullet :: Double -> Game -> Game
 firePaddleBullet time g = if canFire then mFire else mNofire
     where canFire = _inputFire g && _firetime g > 0.9
           (x, y) = _pos $ _paddle g
-          bullet = Item (3, 9) (x, y-20) (0, -200)
+          bullet = Item (3, 9) (x, y-40) (0, -200)
           mFire = g { _bullets = bullet : _bullets g, _firetime = 0 }
           mNofire = g { _firetime = time + _firetime g }
 

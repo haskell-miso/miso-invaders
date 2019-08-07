@@ -1,10 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- TODO keyboard events
 -- TODO audio
 -- TODO flip paddle ?
-
--- http://hackage.haskell.org/package/ghcjs-base
 
 import qualified Game as G
 
@@ -30,9 +27,6 @@ paddleImgName = "spongebob-small.png"
 data Model = Model
     { _game :: G.Game
     , _time :: Double
-    , _inputLeft :: Bool
-    , _inputRight :: Bool
-    , _inputFire :: Bool
     } deriving (Eq)
 
 data Action
@@ -52,15 +46,15 @@ main :: IO ()
 main = do
     paddleImg <- jsNewImage
     jsSetSrc paddleImg paddleImgName
-    myRands <- randoms <$> newStdGen
-    -- myRands <- take 1000 . randoms <$> newStdGen
+    -- myRands <- randoms <$> newStdGen
+    myRands <- take 10000 . randoms <$> newStdGen  -- TODO
     time0 <- myGetTime
     let game0 = G.createGame myRands paddleWidth paddleHeight
     startApp App
-        { initialAction = ActionDisplay
+        { initialAction = ActionNone  -- TODO
         , update        = updateModel paddleImg
         , view          = viewModel
-        , model         = Model game0 time0 False False False
+        , model         = Model game0 time0
         , subs          = [ keyboardSub ActionKey ]
         , events        = defaultEvents
         , mountPoint    = Nothing
@@ -90,7 +84,8 @@ viewModel _ = div_ []
     ]
 
 drawItem :: JSC.Context -> G.Item -> IO ()
-drawItem ctx (G.Item (sx, sy) (px, py) _) = JSC.fillRect px py sx sy ctx
+drawItem ctx (G.Item (sx, sy) (px, py) _) = 
+    JSC.fillRect (px-0.5*sx) (py-0.5*sy) sx sy ctx
 
 drawGame :: JSC.Image -> G.Game -> IO ()
 drawGame paddleImg game = do
@@ -106,7 +101,7 @@ drawGame paddleImg game = do
     mapM_ (drawItem ctx) (G._invaders game)
     JSC.stroke ctx
     -- draw paddle
-    jsDrawImage paddleImg x y ctx
+    jsDrawImage paddleImg (x-0.5*paddleWidth) (y-0.5*paddleHeight) ctx
     where paddle = G._paddle game
           (x, y) = G._pos paddle
 
@@ -135,14 +130,20 @@ updateModel _ ActionDisplay m = m <#
         _ -> ActionStep <$> myGetTime
 
 updateModel paddleImg (ActionStep t1) m = m' <# do
-    drawGame paddleImg game'
+    drawGame paddleImg game
     pure ActionDisplay
     where t0 = _time m
-          game' = G.step (t1 - t0) (_game m)
+          dt = t1 - t0
+          game = _game m
+          game' = G.step dt game
           m' = m { _game = game', _time = t1 }
 
-updateModel _ (ActionKey ks) m =
-    m <# return (if S.member 39 ks then ActionDisplay else ActionNone)
+updateModel _ (ActionKey ks) m = m { _game = game' } <# pure ActionDisplay -- TODO
+    where game' = (_game m) 
+                    { G._inputLeft = S.member 37 ks
+                    , G._inputRight = S.member 39 ks
+                    , G._inputFire = S.member 32 ks
+                    }
 
 ----------------------------------------------------------------------
 -- JavaScript FFI
@@ -159,4 +160,7 @@ foreign import javascript unsafe "$r = mycanvas.getContext('2d');"
 
 foreign import javascript unsafe "$4.drawImage($1, $2, $3);"
     jsDrawImage :: JSC.Image -> Double -> Double -> JSC.Context -> IO ()
+
+foreign import javascript unsafe "console.log($1);"
+    jsConsoleLog :: MS.MisoString -> IO ()
 
