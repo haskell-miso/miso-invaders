@@ -11,6 +11,6 @@ RUN nix-shell --run "echo done"
 
 WORKDIR /root
 
-# docker build -t juliendehos/miso-invaders:latest .
-# docker push juliendehos/miso-invaders:latest
+# docker build -t juliendehos/cicd:miso-invaders -f Dockerfile ..
+# docker push juliendehos/cicd:miso-invaders
 
