@@ -48,9 +48,9 @@ main = do
     jsSetSrc paddleImg paddleImgName
     rands <- take 1000 . randoms <$> newStdGen
     time0 <- myGetTime
-    let game0 = G.createGame rands paddleWidth paddleHeight
+    let game0 = G.createGame False rands paddleWidth paddleHeight
     startApp App
-        { initialAction = ActionNone
+        { initialAction = ActionDisplay False
         , update        = updateModel paddleImg
         , view          = viewModel
         , model         = Model game0 time0 rands
@@ -125,10 +125,11 @@ updateModel _ ActionNone m = noEff m
 
 updateModel _ ActionReset m = m' <# pure (ActionDisplay False)
     where rands' = G.doCycle 1 (_rands m)
-          game' = G.createGame rands' paddleWidth paddleHeight
+          game' = G.createGame True rands' paddleWidth paddleHeight
           m' = m { _game = game', _rands = rands' }
 
 updateModel _ (ActionDisplay hasShoot) m = m <# case G._status (_game m) of
+    G.Welcome -> drawText "Welcome ! Press Enter to start..." >> pure ActionNone
     G.Won -> drawText "You win !" >> pure ActionNone
     G.Lost -> drawText "Game over !" >> pure ActionNone
     _ -> when hasShoot jsPlayAudio >> ActionStep <$> myGetTime

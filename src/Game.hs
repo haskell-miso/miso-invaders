@@ -11,7 +11,7 @@ gameWidthD, gameHeightD :: Double
 gameWidthD = fromIntegral gameWidth
 gameHeightD = fromIntegral gameHeight
 
-data Status = Running | Won | Lost deriving (Eq)
+data Status = Welcome | Running | Won | Lost deriving (Eq)
 
 data Item = Item
     { _siz :: P.Point Double
@@ -37,9 +37,11 @@ doCycle n xs = let (xs0, xs1) = splitAt n xs in xs1++xs0
 getCycle :: Int -> [a] -> ([a], [a])
 getCycle n xs = let (xs0, xs1) = splitAt n xs in (xs0, xs1++xs0)
 
-createGame :: [Double] -> Double -> Double -> Game
-createGame rands0 pw ph = Game Running False False False rands1 0 myPaddle [] myInvaders
-    where myPaddle = Item (pw, ph) (gameWidthD/2, gameHeightD - ph) (0, 0)
+createGame :: Bool -> [Double] -> Double -> Double -> Game
+createGame isRunning rands0 pw ph = 
+    Game status False False False rands1 0 myPaddle [] myInvaders
+    where status = if isRunning then Running else Welcome
+          myPaddle = Item (pw, ph) (gameWidthD/2, gameHeightD - ph) (0, 0)
           ([mag, dir], rands1) = getCycle 2 rands0
           vx = (150 + 200 * mag) * (if dir < 0.5 then 1 else -1)
           myInvaders = [ Item (70, 20) 
@@ -90,7 +92,9 @@ fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
           fighters0 = M.toList $ foldl fInsert M.empty invadersPos
           (rands0, rands1) = getCycle (length fighters0) (_rands g)
           (rands2, rands3) = getCycle (length fighters0) rands1
-          difficulty = 0.9 + fromIntegral (length invadersPos) * (0.99 - 0.9) / 15
+          nbInvaders0 = 15
+          ratioInvaders = fromIntegral (length invadersPos) / nbInvaders0
+          difficulty = 0.95 + 0.04 * ratioInvaders
           fighters1 = [ (p, v) | (p, r, v) <- zip3 fighters0 rands0 rands2, r > difficulty ]
           createBullet ((x, y), v) = Item (3, 9) (x, y+20) (0, 300+v*200)
           bs = map createBullet fighters1
