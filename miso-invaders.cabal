@@ -1,7 +1,7 @@
 name:               miso-invaders
 version:            0.1
 build-type:         Simple
-cabal-version:      >=1.10
+cabal-version:      >=1.22
 
 executable miso-invaders
     main-is:            Main.hs
