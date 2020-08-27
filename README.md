@@ -11,7 +11,7 @@ Space-invaders in Haskell, using [Miso](https://github.com/dmjio/miso).
 How to build:
 
 ```
-nix-shell --run make
+make
 firefox public/index.html
 ```
 

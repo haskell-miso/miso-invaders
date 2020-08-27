@@ -57,6 +57,7 @@ main = do
         , subs          = [ keyboardSub ActionKey ]
         , events        = defaultEvents
         , mountPoint    = Nothing
+        , logLevel      = Off
         }
 
 ----------------------------------------------------------------------

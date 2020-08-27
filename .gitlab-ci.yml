@@ -1,8 +1,10 @@
 pages:
-    image: juliendehos/cicd:miso-invaders
+    image: nixos/nix
     script:
+        - nix-env -iA nixos.cachix
+        - cachix use miso-haskell
         - nix-shell --run "cabal --http-transport=plain-http build"
-        - cp dist/build/miso-invaders/miso-invaders.jsexe/all.js public/
+        - cp `find dist-newstyle -name all.js` public/
     artifacts:
         paths:
             - public

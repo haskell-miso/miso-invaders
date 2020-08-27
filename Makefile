@@ -1,8 +1,7 @@
-
 all:
-	cabal build miso-invaders
-	cp dist/build/miso-invaders/miso-invaders.jsexe/all.js public/
+	nix-shell --run "cabal build"
+	cp `find dist-newstyle -name all.js` public/
 
 clean:
-	rm -rf dist public/all.js
+	rm -rf dist-newstyle public/all.js
 

@@ -1,5 +1,7 @@
 with (import (builtins.fetchTarball {
-  url = "https://github.com/dmjio/miso/archive/561ffad.tar.gz";
-  sha256 = "1wwzckz2qxb873wdkwqmx9gmh0wshcdxi7gjwkba0q51jnkfdi41";
+  # miso 1.7.1
+  url = "https://github.com/dmjio/miso/archive/bb23019.tar.gz";
+  sha256 = "0q44lxzz8pp89ccaiw3iwczha8x2rxjwmgzkxj8cxm97ymsm0diy";
 }) {});
-pkgs.haskell.packages.ghcjs.callCabal2nix "miso-invaders" ./. {}
+(pkgs.haskell.packages.ghcjs.callCabal2nix "miso-invaders" ./. {}).env
+
