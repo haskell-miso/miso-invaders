@@ -1,6 +1,6 @@
 .*~
 .*.swp
-dist
+dist-*
 result
 public/all.js
 
