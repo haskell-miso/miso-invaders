@@ -2,6 +2,7 @@ pages:
     image: nixos/nix
     script:
         - nix-env -iA nixpkgs.cachix
+        - nix-env -iA nixpkgs.cabal-install
         - cachix use miso-haskell
         - nix-shell --run "cabal --http-transport=plain-http build"
         - cp `find dist-newstyle -name all.js` public/
