@@ -7,11 +7,3 @@ Space-invaders in Haskell, using [Miso](https://github.com/dmjio/miso).
 
 ![](archive/miso-invaders.mp4)
 
-
-How to build:
-
-```
-make
-firefox public/index.html
-```
-

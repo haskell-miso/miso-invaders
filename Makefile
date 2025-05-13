@@ -1,7 +1,7 @@
 all:
-	nix-shell --run "cabal build"
-	cp `find dist-newstyle -name all.js` public/
+	nix develop --command bash -c "./build.sh"
+	http-server public
 
 clean:
-	rm -rf dist-newstyle public/all.js
+	rm -rf dist-newstyle public
 
