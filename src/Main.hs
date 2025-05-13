@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 import qualified Game as G
@@ -38,6 +39,10 @@ data Action
 ----------------------------------------------------------------------
 -- main functions
 ----------------------------------------------------------------------
+
+#ifdef WASM
+foreign export javascript "hs_start" main :: IO ()
+#endif
 
 myGetTime :: IO Double
 myGetTime = (* 0.001) <$> now

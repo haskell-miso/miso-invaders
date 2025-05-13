@@ -7,3 +7,9 @@ Space-invaders in Haskell, using [Miso](https://github.com/dmjio/miso).
 
 ![](archive/miso-invaders.mp4)
 
+## TODO
+
+- https://github.com/dmjio/miso/blob/master/examples/svg/Main.hs
+- https://haddocks.haskell-miso.org/miso/Miso-Svg.html
+
+
