@@ -1,5 +1,5 @@
+
 {-# LANGUAGE CPP #-}
--- {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where

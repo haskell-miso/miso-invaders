@@ -72,7 +72,7 @@ main = do
 viewModel :: Model -> View Action
 viewModel _ = div_ []
     [ h1_ [] [ text "miso-invaders" ]
-    , p_ [] [ audio_ [ id_ "myaudio", src_ "laugh.mp3" ] [] ]
+    , p_ [] [ audio_ [ id_ "myaudio", src_ "touched.mp3" ] [] ]
     , p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
     , p_ [] [ canvas_ [ id_ "mycanvas"
                       , width_ (MS.ms G.gameWidth)
