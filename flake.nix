@@ -9,6 +9,7 @@
       devShells.default = pkgs.mkShell {
         packages = [
           inputs.ghc-wasm-meta.packages.${system}.all_9_12
+          pkgs.gnumake
           pkgs.http-server
         ];
       };

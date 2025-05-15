@@ -1,6 +1,3 @@
-.*~
-.*.swp
 dist-*
-result
-public/all.js
+public
 

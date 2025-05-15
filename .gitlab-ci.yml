@@ -2,8 +2,10 @@
 pages:
   image: nixos/nix
   script:
-    - nix --extra-experimental-features "nix-command flakes" develop --command bash -c "./build.sh"
+    - nix --extra-experimental-features "nix-command flakes" develop --command bash -c "make"
   artifacts:
     paths:
       - public
+  only:
+    - ci
 
