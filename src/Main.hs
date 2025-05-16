@@ -9,7 +9,7 @@ module Main where
 
 import Miso
 import Miso.Canvas as Canvas
-import Miso.String qualified as String
+import Miso.String as String
 import Miso.Style as Style
 
 import Game
@@ -18,6 +18,21 @@ import Game
 foreign export javascript "hs_start" main :: IO ()
 #endif
 
+----------------------------------------------------------------------
+-- params
+----------------------------------------------------------------------
+
+paddleWidth, paddleHeight :: Double
+paddleWidth = 70
+paddleHeight = 66
+
+paddleImgName :: MisoString
+paddleImgName = "spongebob.png"
+
+----------------------------------------------------------------------
+-- types
+----------------------------------------------------------------------
+
 type Model = ()
 
 mkModel :: Model
@@ -25,16 +40,12 @@ mkModel = ()
 
 type Action = ()
 
-main :: IO ()
-main =
-  run $ do
-    spongebob <- newImage "spongebob.png"
-    startComponent (app spongebob) { initialAction = Just () }
-  where
-    app sb = defaultComponent mkModel handleUpdate (handleView sb)
+----------------------------------------------------------------------
+-- view handler
+----------------------------------------------------------------------
 
 handleView :: Image -> Model -> View Action
-handleView sb model = 
+handleView paddleImg model = 
   div_ [] 
     [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
     , Canvas.canvas_ 
@@ -43,7 +54,7 @@ handleView sb model =
         , height_ (String.ms gameHeight)
         , Style.style_  [Style.border "1px solid black"]
         ] 
-        (canvasDraw sb model)
+        (canvasDraw paddleImg model)
     , p_ []
          [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"]
               [ text "source code" ]
@@ -54,13 +65,28 @@ handleView sb model =
  ]
 
 canvasDraw :: Image -> Model -> Canvas ()
-canvasDraw sb () = do
+canvasDraw paddleImg () = do
    globalCompositeOperation DestinationOver
-   clearRect (0, 0, 800, 600)
-   fillStyle $ Canvas.color (Style.rgba 0 0 0 0.6)
-   strokeStyle $ Canvas.color (Style.rgba 0 153 255 0.4)
-   drawImage' (sb, 0, 0, 50, 50)
+   clearRect (0, 0, gameWidthD, gameHeightD)
+   -- fillStyle $ Canvas.color (Style.rgba 0 0 0 1.0)
+   -- strokeStyle $ Canvas.color (Style.rgba 0 153 255 0.4)
+   drawImage' (paddleImg, 0, 0, paddleWidth, paddleHeight)
+
+----------------------------------------------------------------------
+-- update handler
+----------------------------------------------------------------------
 
 handleUpdate :: Action -> Effect Model Action
 handleUpdate () = pure ()
+
+----------------------------------------------------------------------
+-- main
+----------------------------------------------------------------------
+
+main :: IO ()
+main =
+  run $ do
+    paddleImg <- newImage paddleImgName
+    let app = defaultComponent mkModel handleUpdate (handleView paddleImg)
+    startComponent app { initialAction = Just () }
 
