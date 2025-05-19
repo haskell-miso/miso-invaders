@@ -21,5 +21,5 @@ serve:
 	http-server public
 
 clean:
-	rm -rf dist-newstyle
+	rm -rf dist-newstyle public
 

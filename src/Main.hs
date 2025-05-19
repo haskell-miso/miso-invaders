@@ -39,13 +39,13 @@ data Model = Model
 
 {-
 makeLenses ''Model
+-}
 
 mTime :: Lens' Model Double
 mTime f o = (\x' -> o {_mTime = x'}) <$> f (_mTime o)
 
 mRands :: Lens' Model [Double]
 mRands f o = (\x' -> o {_mRands = x'}) <$> f (_mRands o)
--}
 
 mGame :: Lens' Model Game
 mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
@@ -87,7 +87,7 @@ canvasDraw paddleImg model = do
     Welcome -> drawText "Welcome ! Press Enter to start..."
     Won     -> drawText "You win !"
     Lost    -> drawText "Game over !"
-    Running -> drawGame (model^.mGame)
+    Running -> drawGame paddleImg (model^.mGame)
 
 drawText :: MS.MisoString -> Canvas ()
 drawText txt = do
@@ -100,10 +100,15 @@ drawItem :: Item -> Canvas ()
 drawItem (Item (V2 sx sy) (V2 px py) _) = 
   fillRect (px-0.5*sx, py-0.5*sy, sx, sy)
 
-drawGame :: Game -> Canvas ()
-drawGame game = do
-  pure ()
-  -- TODO
+drawGame :: Image -> Game -> Canvas ()
+drawGame paddleImg game = do
+    -- lineWidth 0
+    fillStyle (color Style.blue)
+    mapM_ drawItem (game^.bullets)
+    fillStyle (color Style.red)
+    mapM_ drawItem (game^.invaders)
+    let (V2 px py) = game^.paddle.pos
+    drawImage (paddleImg, px-0.5*paddleWidth, py-0.5*paddleHeight)
 
 ----------------------------------------------------------------------
 -- update handler

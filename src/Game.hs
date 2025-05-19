@@ -48,10 +48,12 @@ data Game = Game
   , _invaders :: [Item]
   } deriving (Eq)
 
-makeLenses ''Item
-makeLenses ''Game
 
 {-
+makeLenses ''Item
+makeLenses ''Game
+-}
+
 -------------------------------------------------------------------------------
 -- lenses
 -- (makeLenses is too long to compile)
@@ -82,7 +84,6 @@ paddle f o = (\x' -> o {_paddle = x'}) <$> f (_paddle o)
 bullets, invaders :: Lens' Game [Item]
 bullets f o = (\x' -> o {_bullets = x'}) <$> f (_bullets o)
 invaders f o = (\x' -> o {_invaders = x'}) <$> f (_invaders o)
--}
 
 -------------------------------------------------------------------------------
 -- 
