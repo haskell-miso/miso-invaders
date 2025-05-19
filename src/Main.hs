@@ -4,13 +4,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import Control.Monad (void)
-import Data.Set qualified as Set
+import Data.Set qualified as S
 import Language.Javascript.JSaddle (JSM, jsg, (#), toJSString)
 import Lens.Micro.Platform hiding (view)
+import Linear
 import Miso
 import Miso.Canvas as Canvas
-import Miso.String (MisoString)
-import Miso.String qualified as String
+import Miso.String qualified as MS
 import Miso.Style qualified as Style
 import System.Random (newStdGen, randoms)
 
@@ -24,7 +24,7 @@ paddleWidth, paddleHeight :: Double
 paddleWidth = 70
 paddleHeight = 66
 
-paddleImgName :: MisoString
+paddleImgName :: MS.MisoString
 paddleImgName = "spongebob.png"
 
 ----------------------------------------------------------------------
@@ -39,21 +39,21 @@ data Model = Model
 
 {-
 makeLenses ''Model
--}
-
-mGame :: Lens' Model Game
-mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
 
 mTime :: Lens' Model Double
 mTime f o = (\x' -> o {_mTime = x'}) <$> f (_mTime o)
 
 mRands :: Lens' Model [Double]
 mRands f o = (\x' -> o {_mRands = x'}) <$> f (_mRands o)
+-}
+
+mGame :: Lens' Model Game
+mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
 
 data Action 
   = ActionReset
   | ActionStep Double
-  | ActionKey (Set.Set Int)
+  | ActionKey (S.Set Int)
 
 ----------------------------------------------------------------------
 -- view handler
@@ -65,8 +65,8 @@ handleView paddleImg model = div_ []
   , p_ [] [ audio_ [ id_ "myaudio", src_ "touched.mp3" ] [] ]
   , Canvas.canvas_ 
       [ id_ "mycanvas"
-      , width_ (String.ms gameWidth)
-      , height_ (String.ms gameHeight)
+      , width_ (MS.ms gameWidth)
+      , height_ (MS.ms gameHeight)
       , Style.style_  [Style.border "1px solid black"]
       ] 
       (canvasDraw paddleImg model)
@@ -89,12 +89,16 @@ canvasDraw paddleImg model = do
     Lost    -> drawText "Game over !"
     Running -> drawGame (model^.mGame)
 
-drawText :: MisoString -> Canvas ()
+drawText :: MS.MisoString -> Canvas ()
 drawText txt = do
   fillStyle (color Style.black)
   textAlign TextAlignCenter
   font "40px Arial"
   fillText (txt, 0.5*gameWidthD, 0.5*gameHeightD)
+
+drawItem :: Item -> Canvas ()
+drawItem (Item (V2 sx sy) (V2 px py) _) = 
+  fillRect (px-0.5*sx, py-0.5*sy, sx, sy)
 
 drawGame :: Game -> Canvas ()
 drawGame game = do
@@ -108,11 +112,12 @@ drawGame game = do
 handleUpdate :: Action -> Effect Model Action
 
 handleUpdate (ActionKey keys) = 
-    if Set.member 13 keys
+    if S.member 13 keys
     then io_ (jsPlayAudio >> consoleLog "bim")
     else io_ (pure ())
 
 handleUpdate _ = io_ (pure ())
+  -- TODO
 
 ----------------------------------------------------------------------
 -- JavaScript FFI
@@ -132,9 +137,9 @@ main :: IO ()
 main = run $ do
   paddleImg <- newImage paddleImgName
   time <- myGetTime
-  consoleLog ("consoleLog " <> String.ms (show time))
-  rands <- randoms <$> newStdGen
-  -- TODO rands <- take 1000 . randoms <$> newStdGen
+  consoleLog ("consoleLog " <> MS.ms (show time))
+  -- TODO rands <- randoms <$> newStdGen
+  rands <- take 1000 . randoms <$> newStdGen
   let game = mkGame False rands paddleWidth paddleHeight
   startComponent Component
     { model = Model game time rands
