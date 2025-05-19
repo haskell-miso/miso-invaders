@@ -1,22 +1,20 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module Main where
-
--- import Control.Monad (replicateM_)
--- import Language.Javascript.JSaddle (JSM, (#), fromJSVal, new, jsg)
-
+import Control.Monad (void)
+import Data.Set qualified as Set
+import Language.Javascript.JSaddle (JSM, jsg, (#), toJSString)
+import Lens.Micro.Platform hiding (view)
 import Miso
 import Miso.Canvas as Canvas
-import Miso.String as String
-import Miso.Style as Style
+import Miso.String (MisoString)
+import Miso.String qualified as String
+import Miso.Style qualified as Style
+import System.Random (newStdGen, randoms)
 
 import Game
-
-#ifdef WASM
-foreign export javascript "hs_start" main :: IO ()
-#endif
 
 ----------------------------------------------------------------------
 -- params
@@ -33,60 +31,124 @@ paddleImgName = "spongebob.png"
 -- types
 ----------------------------------------------------------------------
 
-type Model = ()
+data Model = Model
+  { _mGame :: Game
+  , _mTime :: Double
+  , _mRands :: [Double]
+  } deriving (Eq)
 
-mkModel :: Model
-mkModel = ()
+{-
+makeLenses ''Model
+-}
 
-type Action = ()
+mGame :: Lens' Model Game
+mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
+
+mTime :: Lens' Model Double
+mTime f o = (\x' -> o {_mTime = x'}) <$> f (_mTime o)
+
+mRands :: Lens' Model [Double]
+mRands f o = (\x' -> o {_mRands = x'}) <$> f (_mRands o)
+
+data Action 
+  = ActionReset
+  | ActionStep Double
+  | ActionKey (Set.Set Int)
 
 ----------------------------------------------------------------------
 -- view handler
 ----------------------------------------------------------------------
 
 handleView :: Image -> Model -> View Action
-handleView paddleImg model = 
-  div_ [] 
-    [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
-    , Canvas.canvas_ 
-        [ id_ "mycanvas"
-        , width_ (String.ms gameWidth)
-        , height_ (String.ms gameHeight)
-        , Style.style_  [Style.border "1px solid black"]
-        ] 
-        (canvasDraw paddleImg model)
-    , p_ []
-         [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"]
-              [ text "source code" ]
-         , text " / "
-         , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"]
-              [ text "demo" ]
-         ]
- ]
+handleView paddleImg model = div_ [] 
+  [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
+  , p_ [] [ audio_ [ id_ "myaudio", src_ "touched.mp3" ] [] ]
+  , Canvas.canvas_ 
+      [ id_ "mycanvas"
+      , width_ (String.ms gameWidth)
+      , height_ (String.ms gameHeight)
+      , Style.style_  [Style.border "1px solid black"]
+      ] 
+      (canvasDraw paddleImg model)
+  , p_ []
+       [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"]
+            [ text "source code" ]
+       , text " / "
+       , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"]
+            [ text "demo" ]
+       ]
+  ]
 
 canvasDraw :: Image -> Model -> Canvas ()
-canvasDraw paddleImg () = do
-   globalCompositeOperation DestinationOver
-   clearRect (0, 0, gameWidthD, gameHeightD)
-   -- fillStyle $ Canvas.color (Style.rgba 0 0 0 1.0)
-   -- strokeStyle $ Canvas.color (Style.rgba 0 153 255 0.4)
-   drawImage' (paddleImg, 0, 0, paddleWidth, paddleHeight)
+canvasDraw paddleImg model = do
+  globalCompositeOperation DestinationOver
+  clearRect (0, 0, gameWidthD, gameHeightD)
+  case model^.mGame.status of
+    Welcome -> drawText "Welcome ! Press Enter to start..."
+    Won     -> drawText "You win !"
+    Lost    -> drawText "Game over !"
+    Running -> drawGame (model^.mGame)
+
+drawText :: MisoString -> Canvas ()
+drawText txt = do
+  fillStyle (color Style.black)
+  textAlign TextAlignCenter
+  font "40px Arial"
+  fillText (txt, 0.5*gameWidthD, 0.5*gameHeightD)
+
+drawGame :: Game -> Canvas ()
+drawGame game = do
+  pure ()
+  -- TODO
 
 ----------------------------------------------------------------------
 -- update handler
 ----------------------------------------------------------------------
 
 handleUpdate :: Action -> Effect Model Action
-handleUpdate () = pure ()
+
+handleUpdate (ActionKey keys) = 
+    if Set.member 13 keys
+    then io_ (jsPlayAudio >> consoleLog "bim")
+    else io_ (pure ())
+
+handleUpdate _ = io_ (pure ())
+
+----------------------------------------------------------------------
+-- JavaScript FFI
+----------------------------------------------------------------------
+
+jsPlayAudio :: JSM ()
+jsPlayAudio = void $ jsg ("myaudio"::String) # ("play"::String) $ ()
 
 ----------------------------------------------------------------------
 -- main
 ----------------------------------------------------------------------
 
+myGetTime :: JSM Double
+myGetTime = (* 0.001) <$> now
+
 main :: IO ()
-main =
-  run $ do
-    paddleImg <- newImage paddleImgName
-    let app = defaultComponent mkModel handleUpdate (handleView paddleImg)
-    startComponent app { initialAction = Just () }
+main = run $ do
+  paddleImg <- newImage paddleImgName
+  time <- myGetTime
+  consoleLog ("consoleLog " <> String.ms (show time))
+  rands <- randoms <$> newStdGen
+  -- TODO rands <- take 1000 . randoms <$> newStdGen
+  let game = mkGame False rands paddleWidth paddleHeight
+  startComponent Component
+    { model = Model game time rands
+    , update = handleUpdate
+    , view = handleView paddleImg
+    , subs = [ keyboardSub ActionKey ]
+    , events = defaultEvents
+    , styles = []
+    , mountPoint = Nothing
+    , logLevel = Off
+    , initialAction = Nothing
+    }
+
+#ifdef WASM
+foreign export javascript "hs_start" main :: IO ()
+#endif
 

@@ -20,3 +20,6 @@ optim:
 serve:
 	http-server public
 
+clean:
+	rm -rf dist-newstyle
+

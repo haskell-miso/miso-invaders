@@ -1,11 +1,11 @@
 
+{-# LANGUAGE TemplateHaskell #-}
+
 module Game where
 
 import Lens.Micro.Platform
 import Data.Map qualified as M
 import Linear
-
--- TODO use lens
 
 -------------------------------------------------------------------------------
 -- params
@@ -23,26 +23,35 @@ gameHeightD = fromIntegral gameHeight
 -- types
 -------------------------------------------------------------------------------
 
-data Status = Welcome | Running | Won | Lost deriving (Eq)
+data Status
+  = Welcome
+  | Running
+  | Won
+  | Lost
+  deriving (Eq)
 
 data Item = Item
-    { _siz :: V2 Double
-    , _pos :: V2 Double
-    , _vel :: V2 Double
-    } deriving (Eq)
+  { _siz :: V2 Double
+  , _pos :: V2 Double
+  , _vel :: V2 Double
+  } deriving (Eq)
 
 data Game = Game
-    { _status :: Status
-    , _inputLeft :: Bool
-    , _inputRight :: Bool
-    , _inputFire :: Bool
-    , _rands :: [Double]
-    , _firetime :: Double
-    , _paddle :: Item
-    , _bullets :: [Item]
-    , _invaders :: [Item]
-    } deriving (Eq)
+  { _status :: Status
+  , _inputLeft :: Bool
+  , _inputRight :: Bool
+  , _inputFire :: Bool
+  , _fireRands :: [Double]
+  , _fireTime :: Double
+  , _paddle :: Item
+  , _bullets :: [Item]
+  , _invaders :: [Item]
+  } deriving (Eq)
 
+makeLenses ''Item
+makeLenses ''Game
+
+{-
 -------------------------------------------------------------------------------
 -- lenses
 -- (makeLenses is too long to compile)
@@ -61,11 +70,11 @@ inputLeft f o = (\x' -> o {_inputLeft = x'}) <$> f (_inputLeft o)
 inputRight f o = (\x' -> o {_inputRight = x'}) <$> f (_inputRight o)
 inputFire f o = (\x' -> o {_inputFire = x'}) <$> f (_inputFire o)
 
-rands :: Lens' Game [Double]
-rands f o = (\x' -> o {_rands = x'}) <$> f (_rands o)
+fireRands :: Lens' Game [Double]
+fireRands f o = (\x' -> o {_fireRands = x'}) <$> f (_fireRands o)
 
-firetime :: Lens' Game Double
-firetime f o = (\x' -> o {_firetime = x'}) <$> f (_firetime o)
+fireTime :: Lens' Game Double
+fireTime f o = (\x' -> o {_fireTime = x'}) <$> f (_fireTime o)
 
 paddle :: Lens' Game Item
 paddle f o = (\x' -> o {_paddle = x'}) <$> f (_paddle o)
@@ -73,6 +82,7 @@ paddle f o = (\x' -> o {_paddle = x'}) <$> f (_paddle o)
 bullets, invaders :: Lens' Game [Item]
 bullets f o = (\x' -> o {_bullets = x'}) <$> f (_bullets o)
 invaders f o = (\x' -> o {_invaders = x'}) <$> f (_invaders o)
+-}
 
 -------------------------------------------------------------------------------
 -- 
@@ -84,8 +94,8 @@ doCycle n xs = let (xs0, xs1) = splitAt n xs in xs1++xs0
 getCycle :: Int -> [a] -> ([a], [a])
 getCycle n xs = let (xs0, xs1) = splitAt n xs in (xs0, xs1++xs0)
 
-createGame :: Bool -> [Double] -> Double -> Double -> Game
-createGame isRunning rands0 pw ph = 
+mkGame :: Bool -> [Double] -> Double -> Double -> Game
+mkGame isRunning rands0 pw ph = 
     Game status False False False rands1 0 myPaddle [] myInvaders
     where status = if isRunning then Running else Welcome
           myPaddle = Item (V2 pw ph) (V2 (gameWidthD/2) (gameHeightD - ph)) (V2 0 0)
@@ -110,11 +120,11 @@ updatePaddle time g = firePaddleBullet time g1
 
 firePaddleBullet :: Double -> Game -> Game
 firePaddleBullet time g = if canFire then mFire else mNofire
-    where canFire = _inputFire g && _firetime g > 0.9
+    where canFire = _inputFire g && _fireTime g > 0.9
           (V2 x y) = _pos $ _paddle g
           bullet = Item (V2 3 9) (V2 x (y-40)) (V2 0 (-200))
-          mFire = g { _bullets = bullet : _bullets g, _firetime = 0 }
-          mNofire = g { _firetime = time + _firetime g }
+          mFire = g { _bullets = bullet : _bullets g, _fireTime = 0 }
+          mNofire = g { _fireTime = time + _fireTime g }
 
 updateInvaders :: Double -> Game -> Game
 updateInvaders time g = if null myInvaders then g else g3
@@ -134,18 +144,18 @@ updateInvaders time g = if null myInvaders then g else g3
           g3 = fireInvadersBullets g2
 
 fireInvadersBullets :: Game -> Game
-fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
+fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _fireRands = rands3 }
     where invadersPos = map _pos $ _invaders g
           fInsert pMap (V2 x y) = M.insertWith max x y pMap
           fighters0 = fmap (uncurry V2) <$> M.toList $ foldl fInsert M.empty invadersPos
-          (rands0, rands1) = getCycle (length fighters0) (_rands g)
+          (rands0, rands1) = getCycle (length fighters0) (_fireRands g)
           (rands2, rands3) = getCycle (length fighters0) rands1
           nbInvaders0 = 15
           ratioInvaders = fromIntegral (length invadersPos) / nbInvaders0
           difficulty = 0.95 + 0.04 * ratioInvaders
           fighters1 = [ (p, v) | (p, r, v) <- zip3 fighters0 rands0 rands2, r > difficulty ]
-          createBullet (V2 x y, v) = Item (V2 3 9) (V2 x (y+20)) (V2 0 (300+v*200))
-          bs = map createBullet fighters1
+          mkBullet (V2 x y, v) = Item (V2 3 9) (V2 x (y+20)) (V2 0 (300+v*200))
+          bs = map mkBullet fighters1
 
 autoUpdateItem :: Double -> Item -> Item
 autoUpdateItem t i@(Item _ p v) = i { _pos = p + t *^ v }

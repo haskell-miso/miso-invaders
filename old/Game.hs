@@ -11,25 +11,30 @@ gameWidthD, gameHeightD :: Double
 gameWidthD = fromIntegral gameWidth
 gameHeightD = fromIntegral gameHeight
 
-data Status = Welcome | Running | Won | Lost deriving (Eq)
+data Status 
+  = Welcome
+  | Running
+  | Won
+  | Lost
+  deriving (Eq)
 
 data Item = Item
-    { _siz :: P.Point Double
-    , _pos :: P.Point Double
-    , _vel :: P.Point Double
-    } deriving (Eq)
+  { _siz :: P.Point Double
+  , _pos :: P.Point Double
+  , _vel :: P.Point Double
+  } deriving (Eq)
 
 data Game = Game
-    { _status :: Status
-    , _inputLeft :: Bool
-    , _inputRight :: Bool
-    , _inputFire :: Bool
-    , _rands :: [Double]
-    , _firetime :: Double
-    , _paddle :: Item
-    , _bullets :: [Item]
-    , _invaders :: [Item]
-    } deriving (Eq)
+  { _status :: Status
+  , _inputLeft :: Bool
+  , _inputRight :: Bool
+  , _inputFire :: Bool
+  , _rands :: [Double]
+  , _firetime :: Double
+  , _paddle :: Item
+  , _bullets :: [Item]
+  , _invaders :: [Item]
+  } deriving (Eq)
 
 doCycle :: Int -> [a] -> [a]
 doCycle n xs = let (xs0, xs1) = splitAt n xs in xs1++xs0
