@@ -1,6 +1,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 import Control.Monad (void)
@@ -52,7 +53,7 @@ mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
 
 data Action 
   = ActionReset
-  | ActionStep Double
+  | ActionStep Double 
   | ActionKey (S.Set Int)
 
 ----------------------------------------------------------------------
@@ -116,13 +117,36 @@ drawGame paddleImg game = do
 
 handleUpdate :: Action -> Effect Model Action
 
+handleUpdate ActionReset = do
+    m <- get
+    let rands' = doCycle 1 (_mRands m)
+        game' = mkGame True rands' paddleWidth paddleHeight
+        m' = m { _mGame = game', _mRands = rands' }
+    put m'
+    io (ActionStep <$> myGetTime)
+
 handleUpdate (ActionKey keys) = 
     if S.member 13 keys
-    then io_ (jsPlayAudio >> consoleLog "bim")
-    else io_ (pure ())
+    then io (consoleLog "new game" >> pure ActionReset)
+    else do
+      m <- get
+      put m { _mGame = (_mGame m) { _inputLeft = S.member 37 keys
+                                , _inputRight = S.member 39 keys
+                                , _inputFire = S.member 32 keys
+                                }
+            }
 
-handleUpdate _ = io_ (pure ())
-  -- TODO
+handleUpdate (ActionStep t1) = do
+    m <- get
+    let t0 = _mTime m
+        dt = t1 - t0
+        game = _mGame m
+        game' = step dt game
+        hasShoot = length (_invaders game') < length (_invaders game)
+        m' = m { _mGame = game', _mTime = t1 }
+    put m'
+    io (ActionStep <$> myGetTime)
+
 
 ----------------------------------------------------------------------
 -- JavaScript FFI

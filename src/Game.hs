@@ -1,4 +1,5 @@
 
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Game where
@@ -41,7 +42,7 @@ data Game = Game
   , _inputLeft :: Bool
   , _inputRight :: Bool
   , _inputFire :: Bool
-  , _fireRands :: [Double]
+  , _rands :: [Double]
   , _fireTime :: Double
   , _paddle :: Item
   , _bullets :: [Item]
@@ -72,8 +73,8 @@ inputLeft f o = (\x' -> o {_inputLeft = x'}) <$> f (_inputLeft o)
 inputRight f o = (\x' -> o {_inputRight = x'}) <$> f (_inputRight o)
 inputFire f o = (\x' -> o {_inputFire = x'}) <$> f (_inputFire o)
 
-fireRands :: Lens' Game [Double]
-fireRands f o = (\x' -> o {_fireRands = x'}) <$> f (_fireRands o)
+rands :: Lens' Game [Double]
+rands f o = (\x' -> o {_rands = x'}) <$> f (_rands o)
 
 fireTime :: Lens' Game Double
 fireTime f o = (\x' -> o {_fireTime = x'}) <$> f (_fireTime o)
@@ -145,11 +146,11 @@ updateInvaders time g = if null myInvaders then g else g3
           g3 = fireInvadersBullets g2
 
 fireInvadersBullets :: Game -> Game
-fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _fireRands = rands3 }
+fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
     where invadersPos = map _pos $ _invaders g
           fInsert pMap (V2 x y) = M.insertWith max x y pMap
           fighters0 = fmap (uncurry V2) <$> M.toList $ foldl fInsert M.empty invadersPos
-          (rands0, rands1) = getCycle (length fighters0) (_fireRands g)
+          (rands0, rands1) = getCycle (length fighters0) (_rands g)
           (rands2, rands3) = getCycle (length fighters0) rands1
           nbInvaders0 = 15
           ratioInvaders = fromIntegral (length invadersPos) / nbInvaders0
