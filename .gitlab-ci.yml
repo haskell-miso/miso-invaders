@@ -6,4 +6,6 @@ pages:
   artifacts:
     paths:
       - public
+  only:
+    - ci
 
