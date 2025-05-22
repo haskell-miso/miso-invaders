@@ -20,4 +20,6 @@ TODO:
 - lens
 - state
 - lazy rands
+- reset -> Game.reset
+- hasShoot -> Game.hasTouched
 

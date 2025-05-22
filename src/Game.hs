@@ -2,7 +2,7 @@
 
 module Game where
 
-import Lens.Micro.Platform
+import Control.Lens
 import Data.Map qualified as M
 import Linear
 
@@ -37,6 +37,7 @@ data Item = Item
 
 data Game = Game
   { _status :: Status
+  , _hasTouched :: Bool
   , _inputLeft :: Bool
   , _inputRight :: Bool
   , _inputFire :: Bool
@@ -66,7 +67,8 @@ vel f o = (\x' -> o {_vel = x'}) <$> f (_vel o)
 status :: Lens' Game Status
 status f o = (\x' -> o {_status = x'}) <$> f (_status o)
 
-inputLeft, inputRight, inputFire :: Lens' Game Bool
+hasTouched, inputLeft, inputRight, inputFire :: Lens' Game Bool
+hasTouched f o = (\x' -> o {_hasTouched = x'}) <$> f (_hasTouched o)
 inputLeft f o = (\x' -> o {_inputLeft = x'}) <$> f (_inputLeft o)
 inputRight f o = (\x' -> o {_inputRight = x'}) <$> f (_inputRight o)
 inputFire f o = (\x' -> o {_inputFire = x'}) <$> f (_inputFire o)
@@ -96,7 +98,7 @@ getCycle n xs = let (xs0, xs1) = splitAt n xs in (xs0, xs1++xs0)
 
 mkGame :: Bool -> [Double] -> Double -> Double -> Game
 mkGame isRunning rands0 pw ph = 
-  Game status False False False rands1 0 myPaddle [] myInvaders
+  Game status False False False False rands1 0 myPaddle [] myInvaders
   where 
     status = if isRunning then Running else Welcome
     myPaddle = Item (V2 pw ph) (V2 (gameWidthD/2) (gameHeightD - ph)) (V2 0 0)
@@ -201,11 +203,15 @@ runCollisions (b:bs) is = (bs1++bs2, is2)
     (bs2, is2) = runCollisions bs is1
 
 step :: Double -> Game -> Game
-step time g = 
-  if _status g /= Running 
-  then g 
-  else updatePaddle time
-          $ updateInvaders time 
-          $ updateBullets time
-          $ updateCollisions g
+step time g0 = 
+  if _status g0 /= Running 
+  then g0 
+  else 
+    let nb0 = length $ g0^.invaders
+        g1 = updatePaddle time
+              $ updateInvaders time 
+              $ updateBullets time
+              $ updateCollisions g0
+        nb1 = length $ g1^.invaders
+    in g1 & hasTouched .~ (nb1<nb0)
 

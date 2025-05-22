@@ -6,7 +6,7 @@ executable miso-invaders
   hs-source-dirs:       src
   main-is:              Main.hs
   other-modules:        Game
-  build-depends:        base, containers, jsaddle, microlens-platform, linear, miso, random
+  build-depends:        base, containers, jsaddle, lens, linear, miso, random
   default-language:     GHC2021
   ghc-options:          -Wall -no-hs-main -optl-mexec-model=reactor "-optl-Wl,--export=hs_start"
   cpp-options:          -DWASM

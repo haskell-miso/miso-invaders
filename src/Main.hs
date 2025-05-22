@@ -4,7 +4,8 @@
 import Control.Monad (void, when)
 import Data.Set qualified as S
 import Language.Javascript.JSaddle (JSM, jsg, (#), toJSString)
-import Lens.Micro.Platform hiding (view)
+-- import Lens.Micro.Platform hiding (view)
+import Control.Lens hiding ((#), view)
 import Linear
 import Miso
 import Miso.Canvas as Canvas
@@ -65,7 +66,6 @@ mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
 handleView :: Image -> Model -> View Action
 handleView paddleImg model = div_ [] 
   [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
-  , p_ [] [ audio_ [ id_ "myaudio", src_ "touched.mp3" ] [] ]
   , Canvas.canvas_ 
       [ id_ "mycanvas"
       , width_ (MS.ms gameWidth)
@@ -80,6 +80,11 @@ handleView paddleImg model = div_ []
        , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"]
             [ text "demo" ]
        ]
+  , p_ [] 
+      [ audio_ [ id_ "myAudioTouched", src_ "touched.mp3" ] []
+      , audio_ [ id_ "myAudioWon", src_ "won.mp3" ] []
+      , audio_ [ id_ "myAudioLost", src_ "lost.mp3" ] []
+      ]
   ]
 
 canvasDraw :: Image -> Model -> Canvas ()
@@ -105,7 +110,6 @@ drawItem (Item (V2 sx sy) (V2 px py) _) =
 
 drawGame :: Image -> Game -> Canvas ()
 drawGame paddleImg game = do
-  -- lineWidth 0
   fillStyle (color Style.blue)
   mapM_ drawItem (game^.bullets)
   fillStyle (color Style.red)
@@ -120,6 +124,7 @@ drawGame paddleImg game = do
 handleUpdate :: Action -> Effect Model Action
 
 handleUpdate ActionReset = do
+  -- TODO state
   m <- get
   let rands' = doCycle 1 (_mRands m)
       game' = mkGame True rands' paddleWidth paddleHeight
@@ -129,35 +134,31 @@ handleUpdate ActionReset = do
 
 handleUpdate (ActionKey keys) = 
   if S.member 13 keys
-  -- then io (consoleLog "new game" >> pure ActionReset)
   then issue ActionReset
   else do
-    m <- get
-    put m { _mGame = (_mGame m) { _inputLeft = S.member 37 keys
-                              , _inputRight = S.member 39 keys
-                              , _inputFire = S.member 32 keys
-                              }
-          }
+    mGame . inputLeft  .= S.member 37 keys
+    mGame . inputRight .= S.member 39 keys
+    mGame . inputFire  .= S.member 32 keys
 
 handleUpdate (ActionStep t1) = do
-  m <- get
-  let t0 = _mTime m
-      dt = t1 - t0
-      game = _mGame m
-      game' = step dt game
-      hasShoot = length (_invaders game') < length (_invaders game)
-      m' = m { _mGame = game', _mTime = t1 }
-  put m'
-  when (game' ^. status == Running) $
-    io (ActionStep <$> myGetTime)
-
+  t0 <- use mTime
+  let dt = t1 - t0
+  mGame %= step dt
+  mTime .= t1
+  hasTouched <- uses mGame _hasTouched
+  st <- uses mGame _status
+  case (st, hasTouched) of
+    (Won, _) -> io_ $ jsPlayAudio "myAudioWon"
+    (Lost, _) -> io_ $ jsPlayAudio "myAudioLost"
+    (Running, False) -> io (ActionStep <$> myGetTime)
+    (Running, True) -> io (jsPlayAudio "myAudioTouched" >> ActionStep <$> myGetTime)
 
 ----------------------------------------------------------------------
 -- JavaScript FFI
 ----------------------------------------------------------------------
 
-jsPlayAudio :: JSM ()
-jsPlayAudio = void $ jsg ("myaudio"::String) # ("play"::String) $ ()
+jsPlayAudio :: String -> JSM ()
+jsPlayAudio name = void $ jsg name # ("play"::String) $ ()
 
 ----------------------------------------------------------------------
 -- main
@@ -170,7 +171,6 @@ main :: IO ()
 main = run $ do
   paddleImg <- newImage paddleImgName
   time <- myGetTime
-  consoleLog ("consoleLog " <> MS.ms (show time))
   -- TODO rands <- randoms <$> newStdGen
   rands <- take 1000 . randoms <$> newStdGen
   let game = mkGame False rands paddleWidth paddleHeight
