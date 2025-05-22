@@ -3,7 +3,6 @@
 import Control.Monad (void, when)
 import Data.Set qualified as S
 import Language.Javascript.JSaddle (JSM, jsg, (#), toJSString)
--- import Lens.Micro.Platform hiding (view)
 import Control.Lens hiding ((#), view)
 import Linear
 import Miso
@@ -123,12 +122,7 @@ drawGame paddleImg game = do
 handleUpdate :: Action -> Effect Model Action
 
 handleUpdate ActionReset = do
-  -- TODO state
-  m <- get
-  let rands' = doCycle 1 (_mRands m)
-      game' = mkGame True rands' paddleWidth paddleHeight
-      m' = m { _mGame = game', _mRands = rands' }
-  put m'
+  mGame %= resetGame
   io (ActionStep <$> myGetTime)
 
 handleUpdate (ActionKey keys) = 

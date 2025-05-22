@@ -44,6 +44,7 @@ data Game = Game
   , _paddle :: !Item
   , _bullets :: ![Item]
   , _invaders :: ![Item]
+  , _paddleSize :: !(V2 Double)
   } deriving (Eq)
 
 
@@ -84,6 +85,9 @@ bullets, invaders :: Lens' Game [Item]
 bullets f o = (\x' -> o {_bullets = x'}) <$> f (_bullets o)
 invaders f o = (\x' -> o {_invaders = x'}) <$> f (_invaders o)
 
+paddleSize :: Lens' Game (V2 Double)
+paddleSize f o = (\x' -> o {_paddleSize = x'}) <$> f (_paddleSize o)
+
 -------------------------------------------------------------------------------
 -- 
 -------------------------------------------------------------------------------
@@ -96,7 +100,7 @@ getCycle n xs = let (xs0, xs1) = splitAt n xs in (xs0, xs1++xs0)
 
 mkGame :: Bool -> [Double] -> Double -> Double -> Game
 mkGame isRunning rands0 pw ph = 
-  Game status False False False False rands1 0 myPaddle [] myInvaders
+  Game status False False False False rands1 0 myPaddle [] myInvaders (V2 pw ph)
   where 
     status = if isRunning then Running else Welcome
     myPaddle = Item (V2 pw ph) (V2 (gameWidthD/2) (gameHeightD - ph)) (V2 0 0)
@@ -106,6 +110,12 @@ mkGame isRunning rands0 pw ph =
                         (V2 (fromIntegral x * 100 + gameWidthD/2) (fromIntegral y * 50 + 20))
                         (V2 vx 0)
                    | x<-[-2..(2::Int)], y<-[0..(2::Int)] ]
+
+resetGame :: Game -> Game
+resetGame game0 =
+  let rands1 = doCycle 1 (game0^.rands)
+      (V2 pw ph) = game0^.paddleSize
+  in mkGame True rands1 pw ph
 
 updatePaddle :: Double -> Game -> Game
 updatePaddle time g = firePaddleBullet time g1
