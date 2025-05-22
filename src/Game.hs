@@ -1,5 +1,3 @@
-{-# LANGUAGE StrictData #-}
-
 module Game where
 
 import Control.Lens
@@ -30,22 +28,22 @@ data Status
   deriving (Eq)
 
 data Item = Item
-  { _siz :: V2 Double
-  , _pos :: V2 Double
-  , _vel :: V2 Double
+  { _siz :: !(V2 Double)
+  , _pos :: !(V2 Double)
+  , _vel :: !(V2 Double)
   } deriving (Eq)
 
 data Game = Game
-  { _status :: Status
-  , _hasTouched :: Bool
-  , _inputLeft :: Bool
-  , _inputRight :: Bool
-  , _inputFire :: Bool
-  , _rands :: [Double]
-  , _fireTime :: Double
-  , _paddle :: Item
-  , _bullets :: [Item]
-  , _invaders :: [Item]
+  { _status :: !Status
+  , _hasTouched :: !Bool
+  , _inputLeft :: !Bool
+  , _inputRight :: !Bool
+  , _inputFire :: !Bool
+  , _rands :: [Double]    -- infinite lazy list
+  , _fireTime :: !Double
+  , _paddle :: !Item
+  , _bullets :: ![Item]
+  , _invaders :: ![Item]
   } deriving (Eq)
 
 

@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StrictData #-}
 
 import Control.Monad (void, when)
 import Data.Set qualified as S
@@ -32,7 +31,7 @@ paddleImgName = "spongebob.png"
 
 data Model = Model
   { _mGame :: Game
-  , _mTime :: Double
+  , _mTime :: !Double
   , _mRands :: [Double]
   } deriving (Eq)
 
