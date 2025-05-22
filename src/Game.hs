@@ -4,8 +4,9 @@ module Game where
 
 import Control.Lens
 import Control.Monad.State
-import Data.Map qualified as M
+import Data.Bool (bool)
 import Data.List (singleton)
+import Data.Map qualified as M
 import Linear
 
 -------------------------------------------------------------------------------
@@ -96,13 +97,15 @@ paddleSize f o = (\x' -> o {_paddleSize = x'}) <$> f (_paddleSize o)
 -- (for wasm/js backends)
 -------------------------------------------------------------------------------
 
-skipCycle :: Int -> [a] -> [a]
-skipCycle n xs = xs1++xs0
-  where (xs0, xs1) = splitAt n xs
-
 takeCycle :: Int -> [a] -> ([a], [a])
 takeCycle n xs = (xs0, xs1++xs0)
   where (xs0, xs1) = splitAt n xs
+
+takeCycleGame :: Int -> State Game [Double]
+takeCycleGame n = do
+  (xs0, xs1) <- uses rands (splitAt n)
+  rands .= xs1++xs0
+  pure xs0
 
 -------------------------------------------------------------------------------
 -- game main functions
@@ -132,10 +135,8 @@ step dt g0
   | _status g0 /= Running = g0
   | otherwise = g1 & hasTouched .~ (nb1<nb0)
     where
-      -- update = updateCollisions >> updateBullets dt >> updateInvaders dt >> updatePaddle dt
-      -- g1 = execState update g0
-      update = updateCollisions >> updateBullets dt
-      g1 = updatePaddle dt $ updateInvaders dt $ execState update g0
+      update = updateCollisions >> updateBullets dt >> updateInvaders dt >> updatePaddle dt
+      g1 = execState update g0
       nb0 = length $ g0^.invaders
       nb1 = length $ g1^.invaders
 
@@ -143,67 +144,68 @@ step dt g0
 -- helpers
 -------------------------------------------------------------------------------
 
--- TODO State Game ()
-updatePaddle :: Double -> Game -> Game
-updatePaddle time g = firePaddleBullet time g1
-  where 
-    dx = time * 200
-    dl = if _inputLeft g then -dx else 0
-    dr = if _inputRight g then dx else 0
-    p0 = _paddle g
-    (V2 x0 y) = _pos p0
-    x1 = max 0 $ min gameWidthD $ dl + dr + x0
-    p1 = p0 { _pos = V2 x1 y }
-    -- p1 = p0 & pos . _y .= x1 
-    g1 = g { _paddle = p1 }
+updatePaddle :: Double -> State Game ()
+updatePaddle time = do
+  let dx = time * 200
+  dl <- uses inputLeft $ bool 0 (-dx)
+  dr <- uses inputRight $ bool 0 dx
+  p0 <- uses paddle _pos
+  let x1 = max 0 $ min gameWidthD $ dl + dr + p0^._x
+  paddle . pos . _x .= x1
+  firePaddleBullet time
 
--- TODO State Game ()
-firePaddleBullet :: Double -> Game -> Game
-firePaddleBullet time g = if canFire then mFire else mNofire
-  where
-    canFire = _inputFire g && _fireTime g > 0.9
-    (V2 x y) = _pos $ _paddle g
-    bullet = Item (V2 3 9) (V2 x (y-40)) (V2 0 (-200))
-    mFire = g { _bullets = bullet : _bullets g, _fireTime = 0 }
-    mNofire = g { _fireTime = time + _fireTime g }
+firePaddleBullet :: Double -> State Game ()
+firePaddleBullet time = do
+  isFireInput <- use inputFire
+  isFireTime <- uses fireTime (>0.9)
+  if isFireInput && isFireTime
+  then do
+    (V2 x y) <- uses paddle  _pos
+    let bullet = Item (V2 3 9) (V2 x (y-40)) (V2 0 (-200))
+    bullets %= (bullet:)
+    fireTime .= 0
+  else fireTime += time 
 
--- TODO State Game ()
-updateInvaders :: Double -> Game -> Game
-updateInvaders time g = if null myInvaders then g else g3
-  where 
-    myInvaders = _invaders g
-    i1 = map (moveItem time) myInvaders
-    xs = map (view (pos . _x)) myInvaders
-    x1min = minimum xs
-    x1max = maximum xs
-    v@(V2 vx _) = _vel $ head myInvaders
-    move v0 v1 i = i { _pos = _pos i + time *^ v0, _vel = v1 }
-    maxx = gameWidthD - 80
-    minx = 80
-    i2 | vx>0 && x1max>maxx = map (move (V2 (maxx-x1max) 0) (negated v)) i1
-       | vx<0 && x1min<minx = map (move (V2 (minx-x1min) 0) (negated v)) i1
-       | otherwise = i1
-    g2 = g { _invaders = i2 }
-    g3 = fireInvadersBullets g2
+updateInvaders :: Double -> State Game ()
+updateInvaders time = do
+  myInvaders <- use invaders
+  case myInvaders of
+    [] -> pure ()
+    (firstInvader:_) -> do
+      let
+        i1 = map (moveItem time) myInvaders
+        xs = map (view (pos . _x)) myInvaders
+        x1min = minimum xs
+        x1max = maximum xs
+        v@(V2 vx _) = firstInvader^.vel
+        move v0 v1 i = i & pos +~ time*^v0 & vel .~ v1
+        maxx = gameWidthD - 80
+        minx = 80
+        i2 | vx>0 && x1max>maxx = map (move (V2 (maxx-x1max) 0) (negated v)) i1
+           | vx<0 && x1min<minx = map (move (V2 (minx-x1min) 0) (negated v)) i1
+           | otherwise = i1
+      invaders .= i2
+      fireInvadersBullets
 
--- TODO State Game ()
-fireInvadersBullets :: Game -> Game
-fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
-  where 
-    invadersPos = map _pos $ _invaders g
+fireInvadersBullets :: State Game ()
+fireInvadersBullets = do
+  invadersPos <- uses invaders (map _pos)
+  let 
     fInsert pMap (V2 x y) = M.insertWith max x y pMap
     fighters0 = fmap (uncurry V2) <$> M.toList $ foldl fInsert M.empty invadersPos
-    (rands0, rands1) = takeCycle (length fighters0) (_rands g)
-    (rands2, rands3) = takeCycle (length fighters0) rands1
+  rands0 <- takeCycleGame (length fighters0) 
+  rands2 <- takeCycleGame (length fighters0)
+  let
     nbInvaders0 = 15
     ratioInvaders = fromIntegral (length invadersPos) / nbInvaders0
     difficulty = 0.95 + 0.04 * ratioInvaders
     fighters1 = [ (p, v) | (p, r, v) <- zip3 fighters0 rands0 rands2, r > difficulty ]
     mkBullet (V2 x y, v) = Item (V2 3 9) (V2 x (y+20)) (V2 0 (300+v*200))
     bs = map mkBullet fighters1
+  bullets %= (++bs)
 
 moveItem :: Double -> Item -> Item
-moveItem t i@(Item _ p v) = i { _pos = p + t *^ v }
+moveItem dt i = i & pos +~ dt *^ i^.vel
 
 updateBullets :: Double -> State Game ()
 updateBullets time = bullets %= filter isInside . map (moveItem time)
