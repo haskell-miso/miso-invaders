@@ -162,6 +162,7 @@ main = run $ do
   paddleImg <- newImage paddleImgName
   time <- myGetTime
   game <- mkGame paddleWidth paddleHeight . take 1000 . randoms <$> newStdGen
+  -- let game = mkGame paddleWidth paddleHeight []
   startComponent Component
     { model = Model game time
     , update = handleUpdate

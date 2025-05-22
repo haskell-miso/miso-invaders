@@ -113,16 +113,18 @@ takeCycleGame n = do
 
 mkGame :: Double -> Double -> [Double] -> Game
 mkGame pw ph rands0 = 
-  Game Welcome False False False False rands1 0 myPaddle [] myInvaders (V2 pw ph)
-  where 
-    myPaddle = Item (V2 pw ph) (V2 (gameWidthD/2) (gameHeightD - ph)) (V2 0 0)
-    ([mag, dir], rands1) = takeCycle 2 rands0
-    vx = (150 + 200 * mag) * (if dir < 0.5 then 1 else -1)
-    myInvaders = 
-      [ Item (V2 70 20) 
-          (V2 (fromIntegral x * 100 + gameWidthD/2) (fromIntegral y * 50 + 20))
-          (V2 vx 0)
-      | x<-[-2..(2::Int)], y<-[0..(2::Int)] ]
+  case takeCycle 2 rands0 of
+    ([mag, dir], rands1) ->  
+      let 
+        myPaddle = Item (V2 pw ph) (V2 (gameWidthD/2) (gameHeightD - ph)) (V2 0 0)
+        vx = (150 + 200 * mag) * (if dir < 0.5 then 1 else -1)
+        myInvaders = 
+          [ Item (V2 70 20) 
+              (V2 (fromIntegral x * 100 + gameWidthD/2) (fromIntegral y * 50 + 20))
+              (V2 vx 0)
+          | x<-[-2..(2::Int)], y<-[0..(2::Int)] ]
+      in Game Welcome False False False False rands1 0 myPaddle [] myInvaders (V2 pw ph)
+    _ -> mkGame pw ph [0, 0.01 .. 1]
 
 resetGame :: Game -> Game
 resetGame game0 = mkGame pw ph rands0 & status .~ Running
