@@ -15,3 +15,9 @@ make
 make serve
 ```
 
+
+TODO:
+- lens
+- state
+- lazy rands
+

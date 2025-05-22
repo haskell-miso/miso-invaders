@@ -1,10 +1,7 @@
-
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
-{-# LANGUAGE TemplateHaskell #-}
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.Set qualified as S
 import Language.Javascript.JSaddle (JSM, jsg, (#), toJSString)
 import Lens.Micro.Platform hiding (view)
@@ -18,7 +15,7 @@ import System.Random (newStdGen, randoms)
 import Game
 
 ----------------------------------------------------------------------
--- params
+-- global parameters
 ----------------------------------------------------------------------
 
 paddleWidth, paddleHeight :: Double
@@ -38,6 +35,16 @@ data Model = Model
   , _mRands :: [Double]
   } deriving (Eq)
 
+data Action 
+  = ActionKey (S.Set Int)
+  | ActionReset
+  | ActionStep Double 
+
+-------------------------------------------------------------------------------
+-- lenses
+-- (compile time is much longer with makeLenses)
+-------------------------------------------------------------------------------
+
 {-
 makeLenses ''Model
 -}
@@ -50,11 +57,6 @@ mRands f o = (\x' -> o {_mRands = x'}) <$> f (_mRands o)
 
 mGame :: Lens' Model Game
 mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
-
-data Action 
-  = ActionReset
-  | ActionStep Double 
-  | ActionKey (S.Set Int)
 
 ----------------------------------------------------------------------
 -- view handler
@@ -103,13 +105,13 @@ drawItem (Item (V2 sx sy) (V2 px py) _) =
 
 drawGame :: Image -> Game -> Canvas ()
 drawGame paddleImg game = do
-    -- lineWidth 0
-    fillStyle (color Style.blue)
-    mapM_ drawItem (game^.bullets)
-    fillStyle (color Style.red)
-    mapM_ drawItem (game^.invaders)
-    let (V2 px py) = game^.paddle.pos
-    drawImage (paddleImg, px-0.5*paddleWidth, py-0.5*paddleHeight)
+  -- lineWidth 0
+  fillStyle (color Style.blue)
+  mapM_ drawItem (game^.bullets)
+  fillStyle (color Style.red)
+  mapM_ drawItem (game^.invaders)
+  let (V2 px py) = game^.paddle.pos
+  drawImage (paddleImg, px-0.5*paddleWidth, py-0.5*paddleHeight)
 
 ----------------------------------------------------------------------
 -- update handler
@@ -118,33 +120,35 @@ drawGame paddleImg game = do
 handleUpdate :: Action -> Effect Model Action
 
 handleUpdate ActionReset = do
-    m <- get
-    let rands' = doCycle 1 (_mRands m)
-        game' = mkGame True rands' paddleWidth paddleHeight
-        m' = m { _mGame = game', _mRands = rands' }
-    put m'
-    io (ActionStep <$> myGetTime)
+  m <- get
+  let rands' = doCycle 1 (_mRands m)
+      game' = mkGame True rands' paddleWidth paddleHeight
+      m' = m { _mGame = game', _mRands = rands' }
+  put m'
+  io (ActionStep <$> myGetTime)
 
 handleUpdate (ActionKey keys) = 
-    if S.member 13 keys
-    then io (consoleLog "new game" >> pure ActionReset)
-    else do
-      m <- get
-      put m { _mGame = (_mGame m) { _inputLeft = S.member 37 keys
-                                , _inputRight = S.member 39 keys
-                                , _inputFire = S.member 32 keys
-                                }
-            }
+  if S.member 13 keys
+  -- then io (consoleLog "new game" >> pure ActionReset)
+  then issue ActionReset
+  else do
+    m <- get
+    put m { _mGame = (_mGame m) { _inputLeft = S.member 37 keys
+                              , _inputRight = S.member 39 keys
+                              , _inputFire = S.member 32 keys
+                              }
+          }
 
 handleUpdate (ActionStep t1) = do
-    m <- get
-    let t0 = _mTime m
-        dt = t1 - t0
-        game = _mGame m
-        game' = step dt game
-        hasShoot = length (_invaders game') < length (_invaders game)
-        m' = m { _mGame = game', _mTime = t1 }
-    put m'
+  m <- get
+  let t0 = _mTime m
+      dt = t1 - t0
+      game = _mGame m
+      game' = step dt game
+      hasShoot = length (_invaders game') < length (_invaders game)
+      m' = m { _mGame = game', _mTime = t1 }
+  put m'
+  when (game' ^. status == Running) $
     io (ActionStep <$> myGetTime)
 
 
