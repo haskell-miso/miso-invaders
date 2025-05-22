@@ -3,7 +3,9 @@
 module Game where
 
 import Control.Lens
+import Control.Monad.State
 import Data.Map qualified as M
+import Data.List (singleton)
 import Linear
 
 -------------------------------------------------------------------------------
@@ -95,14 +97,12 @@ paddleSize f o = (\x' -> o {_paddleSize = x'}) <$> f (_paddleSize o)
 -------------------------------------------------------------------------------
 
 skipCycle :: Int -> [a] -> [a]
-skipCycle n xs =
-  let (xs0, xs1) = splitAt n xs
-  in xs1++xs0
+skipCycle n xs = xs1++xs0
+  where (xs0, xs1) = splitAt n xs
 
 takeCycle :: Int -> [a] -> ([a], [a])
-takeCycle n xs =
-  let (xs0, xs1) = splitAt n xs
-  in (xs0, xs1++xs0)
+takeCycle n xs = (xs0, xs1++xs0)
+  where (xs0, xs1) = splitAt n xs
 
 -------------------------------------------------------------------------------
 -- game main functions
@@ -122,28 +122,28 @@ mkGame pw ph rands0 =
       | x<-[-2..(2::Int)], y<-[0..(2::Int)] ]
 
 resetGame :: Game -> Game
-resetGame game0 =
-  let rands0 = game0^.rands
-      (V2 pw ph) = game0^.paddleSize
-  in mkGame pw ph rands0 & status .~ Running
+resetGame game0 = mkGame pw ph rands0 & status .~ Running
+  where
+    rands0 = game0^.rands
+    (V2 pw ph) = game0^.paddleSize
 
 step :: Double -> Game -> Game
-step time g0 = 
-  if _status g0 /= Running 
-  then g0 
-  else 
-    let nb0 = length $ g0^.invaders
-        g1 = updatePaddle time
-              $ updateInvaders time 
-              $ updateBullets time
-              $ updateCollisions g0
-        nb1 = length $ g1^.invaders
-    in g1 & hasTouched .~ (nb1<nb0)
+step dt g0
+  | _status g0 /= Running = g0
+  | otherwise = g1 & hasTouched .~ (nb1<nb0)
+    where
+      -- update = updateCollisions >> updateBullets dt >> updateInvaders dt >> updatePaddle dt
+      -- g1 = execState update g0
+      update = updateCollisions >> updateBullets dt
+      g1 = updatePaddle dt $ updateInvaders dt $ execState update g0
+      nb0 = length $ g0^.invaders
+      nb1 = length $ g1^.invaders
 
 -------------------------------------------------------------------------------
 -- helpers
 -------------------------------------------------------------------------------
 
+-- TODO State Game ()
 updatePaddle :: Double -> Game -> Game
 updatePaddle time g = firePaddleBullet time g1
   where 
@@ -157,20 +157,22 @@ updatePaddle time g = firePaddleBullet time g1
     -- p1 = p0 & pos . _y .= x1 
     g1 = g { _paddle = p1 }
 
+-- TODO State Game ()
 firePaddleBullet :: Double -> Game -> Game
 firePaddleBullet time g = if canFire then mFire else mNofire
   where
-  canFire = _inputFire g && _fireTime g > 0.9
-  (V2 x y) = _pos $ _paddle g
-  bullet = Item (V2 3 9) (V2 x (y-40)) (V2 0 (-200))
-  mFire = g { _bullets = bullet : _bullets g, _fireTime = 0 }
-  mNofire = g { _fireTime = time + _fireTime g }
+    canFire = _inputFire g && _fireTime g > 0.9
+    (V2 x y) = _pos $ _paddle g
+    bullet = Item (V2 3 9) (V2 x (y-40)) (V2 0 (-200))
+    mFire = g { _bullets = bullet : _bullets g, _fireTime = 0 }
+    mNofire = g { _fireTime = time + _fireTime g }
 
+-- TODO State Game ()
 updateInvaders :: Double -> Game -> Game
 updateInvaders time g = if null myInvaders then g else g3
   where 
     myInvaders = _invaders g
-    i1 = map (autoUpdateItem time) myInvaders
+    i1 = map (moveItem time) myInvaders
     xs = map (view (pos . _x)) myInvaders
     x1min = minimum xs
     x1max = maximum xs
@@ -184,6 +186,7 @@ updateInvaders time g = if null myInvaders then g else g3
     g2 = g { _invaders = i2 }
     g3 = fireInvadersBullets g2
 
+-- TODO State Game ()
 fireInvadersBullets :: Game -> Game
 fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
   where 
@@ -199,25 +202,20 @@ fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
     mkBullet (V2 x y, v) = Item (V2 3 9) (V2 x (y+20)) (V2 0 (300+v*200))
     bs = map mkBullet fighters1
 
-autoUpdateItem :: Double -> Item -> Item
-autoUpdateItem t i@(Item _ p v) = i { _pos = p + t *^ v }
+moveItem :: Double -> Item -> Item
+moveItem t i@(Item _ p v) = i { _pos = p + t *^ v }
 
-updateBullets :: Double -> Game -> Game
-updateBullets time g = g { _bullets = b2 }
-  where 
-    b1 = map (autoUpdateItem time) (_bullets g)
-    b2 = filter (\b -> b^.pos._y < gameHeightD && b^.pos._y > 0) b1
+updateBullets :: Double -> State Game ()
+updateBullets time = bullets %= filter isInside . map (moveItem time)
+  where isInside b = b^.pos._y < gameHeightD && b^.pos._y > 0
 
-updateCollisions :: Game -> Game
-updateCollisions g = g1 { _invaders = i1, _bullets = b2, _status = st }
-  where 
-    (b1, i1) = runCollisions (_bullets g) (_invaders g)
-    (b2, p2) = runCollisions b1 [_paddle g]
-    st | null i1 = Won 
-       | null p2 = Lost
-       | otherwise = Running
-    g1 = if st == Running then g 
-         else g { _inputLeft = False, _inputRight = False, _inputFire = False }
+updateCollisions :: State Game ()
+updateCollisions = do
+  (b1, i1) <- runCollisions <$> use bullets <*> use invaders
+  (b2, p2) <- runCollisions b1 . singleton <$> use paddle
+  invaders .= i1
+  bullets .= b2
+  status .= if null i1 then Won else if null p2 then Lost else Running
 
 testCollision :: Item -> Item -> Bool
 testCollision (Item as ap _) (Item bs bp _) =
