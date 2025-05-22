@@ -15,10 +15,3 @@ make
 make serve
 ```
 
-
-TODO:
-- lens
-- state
-- lazy rands
-- reset -> Game.reset
-

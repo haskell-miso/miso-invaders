@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StrictData #-}
 
-import Control.Monad (void, when)
+import Control.Monad (void)
 import Data.Set qualified as S
-import Language.Javascript.JSaddle (JSM, jsg, (#), toJSString)
+import Language.Javascript.JSaddle (JSM, jsg, (#))
 import Control.Lens hiding ((#), view)
 import Linear
 import Miso
@@ -30,8 +31,7 @@ paddleImgName = "spongebob.png"
 
 data Model = Model
   { _mGame :: Game
-  , _mTime :: !Double
-  , _mRands :: [Double]
+  , _mTime :: Double
   } deriving (Eq)
 
 data Action 
@@ -50,9 +50,6 @@ makeLenses ''Model
 
 mTime :: Lens' Model Double
 mTime f o = (\x' -> o {_mTime = x'}) <$> f (_mTime o)
-
-mRands :: Lens' Model [Double]
-mRands f o = (\x' -> o {_mRands = x'}) <$> f (_mRands o)
 
 mGame :: Lens' Model Game
 mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
@@ -135,16 +132,16 @@ handleUpdate (ActionKey keys) =
 
 handleUpdate (ActionStep t1) = do
   t0 <- use mTime
-  let dt = t1 - t0
-  mGame %= step dt
+  mGame %= step (t1 - t0)
   mTime .= t1
-  hasTouched <- uses mGame _hasTouched
+  touched <- uses mGame _hasTouched
   st <- uses mGame _status
-  case (st, hasTouched) of
+  case (st, touched) of
     (Won, _) -> io_ $ jsPlayAudio "myAudioWon"
     (Lost, _) -> io_ $ jsPlayAudio "myAudioLost"
     (Running, False) -> io (ActionStep <$> myGetTime)
     (Running, True) -> io (jsPlayAudio "myAudioTouched" >> ActionStep <$> myGetTime)
+    _ -> pure ()
 
 ----------------------------------------------------------------------
 -- JavaScript FFI
@@ -164,11 +161,9 @@ main :: IO ()
 main = run $ do
   paddleImg <- newImage paddleImgName
   time <- myGetTime
-  -- TODO rands <- randoms <$> newStdGen
-  rands <- take 1000 . randoms <$> newStdGen
-  let game = mkGame False rands paddleWidth paddleHeight
+  game <- mkGame paddleWidth paddleHeight . take 1000 . randoms <$> newStdGen
   startComponent Component
-    { model = Model game time rands
+    { model = Model game time
     , update = handleUpdate
     , view = handleView paddleImg
     , subs = [ keyboardSub ActionKey ]

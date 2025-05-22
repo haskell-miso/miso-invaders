@@ -1,3 +1,5 @@
+{-# LANGUAGE StrictData #-}
+
 module Game where
 
 import Control.Lens
@@ -28,25 +30,24 @@ data Status
   deriving (Eq)
 
 data Item = Item
-  { _siz :: !(V2 Double)
-  , _pos :: !(V2 Double)
-  , _vel :: !(V2 Double)
+  { _siz  :: V2 Double
+  , _pos  :: V2 Double
+  , _vel  :: V2 Double
   } deriving (Eq)
 
 data Game = Game
-  { _status :: !Status
-  , _hasTouched :: !Bool
-  , _inputLeft :: !Bool
-  , _inputRight :: !Bool
-  , _inputFire :: !Bool
-  , _rands :: [Double]    -- infinite lazy list
-  , _fireTime :: !Double
-  , _paddle :: !Item
-  , _bullets :: ![Item]
-  , _invaders :: ![Item]
-  , _paddleSize :: !(V2 Double)
+  { _status       :: Status
+  , _hasTouched   :: Bool
+  , _inputLeft    :: Bool
+  , _inputRight   :: Bool
+  , _inputFire    :: Bool
+  , _rands        :: [Double]
+  , _fireTime     :: Double
+  , _paddle       :: Item
+  , _bullets      :: [Item]
+  , _invaders     :: [Item]
+  , _paddleSize   :: V2 Double
   } deriving (Eq)
-
 
 -------------------------------------------------------------------------------
 -- lenses
@@ -89,33 +90,59 @@ paddleSize :: Lens' Game (V2 Double)
 paddleSize f o = (\x' -> o {_paddleSize = x'}) <$> f (_paddleSize o)
 
 -------------------------------------------------------------------------------
--- 
+-- simulate an infinite list
+-- (for wasm/js backends)
 -------------------------------------------------------------------------------
 
-doCycle :: Int -> [a] -> [a]
-doCycle n xs = let (xs0, xs1) = splitAt n xs in xs1++xs0
+skipCycle :: Int -> [a] -> [a]
+skipCycle n xs =
+  let (xs0, xs1) = splitAt n xs
+  in xs1++xs0
 
-getCycle :: Int -> [a] -> ([a], [a])
-getCycle n xs = let (xs0, xs1) = splitAt n xs in (xs0, xs1++xs0)
+takeCycle :: Int -> [a] -> ([a], [a])
+takeCycle n xs =
+  let (xs0, xs1) = splitAt n xs
+  in (xs0, xs1++xs0)
 
-mkGame :: Bool -> [Double] -> Double -> Double -> Game
-mkGame isRunning rands0 pw ph = 
-  Game status False False False False rands1 0 myPaddle [] myInvaders (V2 pw ph)
+-------------------------------------------------------------------------------
+-- game main functions
+-------------------------------------------------------------------------------
+
+mkGame :: Double -> Double -> [Double] -> Game
+mkGame pw ph rands0 = 
+  Game Welcome False False False False rands1 0 myPaddle [] myInvaders (V2 pw ph)
   where 
-    status = if isRunning then Running else Welcome
     myPaddle = Item (V2 pw ph) (V2 (gameWidthD/2) (gameHeightD - ph)) (V2 0 0)
-    ([mag, dir], rands1) = getCycle 2 rands0
+    ([mag, dir], rands1) = takeCycle 2 rands0
     vx = (150 + 200 * mag) * (if dir < 0.5 then 1 else -1)
-    myInvaders = [ Item (V2 70 20) 
-                        (V2 (fromIntegral x * 100 + gameWidthD/2) (fromIntegral y * 50 + 20))
-                        (V2 vx 0)
-                   | x<-[-2..(2::Int)], y<-[0..(2::Int)] ]
+    myInvaders = 
+      [ Item (V2 70 20) 
+          (V2 (fromIntegral x * 100 + gameWidthD/2) (fromIntegral y * 50 + 20))
+          (V2 vx 0)
+      | x<-[-2..(2::Int)], y<-[0..(2::Int)] ]
 
 resetGame :: Game -> Game
 resetGame game0 =
-  let rands1 = doCycle 1 (game0^.rands)
+  let rands0 = game0^.rands
       (V2 pw ph) = game0^.paddleSize
-  in mkGame True rands1 pw ph
+  in mkGame pw ph rands0 & status .~ Running
+
+step :: Double -> Game -> Game
+step time g0 = 
+  if _status g0 /= Running 
+  then g0 
+  else 
+    let nb0 = length $ g0^.invaders
+        g1 = updatePaddle time
+              $ updateInvaders time 
+              $ updateBullets time
+              $ updateCollisions g0
+        nb1 = length $ g1^.invaders
+    in g1 & hasTouched .~ (nb1<nb0)
+
+-------------------------------------------------------------------------------
+-- helpers
+-------------------------------------------------------------------------------
 
 updatePaddle :: Double -> Game -> Game
 updatePaddle time g = firePaddleBullet time g1
@@ -163,8 +190,8 @@ fireInvadersBullets g = g { _bullets = _bullets g ++ bs, _rands = rands3 }
     invadersPos = map _pos $ _invaders g
     fInsert pMap (V2 x y) = M.insertWith max x y pMap
     fighters0 = fmap (uncurry V2) <$> M.toList $ foldl fInsert M.empty invadersPos
-    (rands0, rands1) = getCycle (length fighters0) (_rands g)
-    (rands2, rands3) = getCycle (length fighters0) rands1
+    (rands0, rands1) = takeCycle (length fighters0) (_rands g)
+    (rands2, rands3) = takeCycle (length fighters0) rands1
     nbInvaders0 = 15
     ratioInvaders = fromIntegral (length invadersPos) / nbInvaders0
     difficulty = 0.95 + 0.04 * ratioInvaders
@@ -209,17 +236,4 @@ runCollisions (b:bs) is = (bs1++bs2, is2)
     is1 = filter (not . testCollision b) is
     bs1 = [b | length is1 == length is]
     (bs2, is2) = runCollisions bs is1
-
-step :: Double -> Game -> Game
-step time g0 = 
-  if _status g0 /= Running 
-  then g0 
-  else 
-    let nb0 = length $ g0^.invaders
-        g1 = updatePaddle time
-              $ updateInvaders time 
-              $ updateBullets time
-              $ updateCollisions g0
-        nb1 = length $ g1^.invaders
-    in g1 & hasTouched .~ (nb1<nb0)
 
