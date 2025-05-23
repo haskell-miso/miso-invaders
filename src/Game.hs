@@ -1,5 +1,3 @@
-{-# LANGUAGE StrictData #-}
-
 module Game where
 
 import Control.Lens
@@ -194,7 +192,7 @@ fireInvadersBullets = do
   invadersPos <- uses invaders (map _pos)
   let 
     fInsert pMap (V2 x y) = M.insertWith max x y pMap
-    fighters0 = fmap (uncurry V2) <$> M.toList $ foldl fInsert M.empty invadersPos
+    fighters0 = fmap (uncurry V2) <$> M.toList $ foldl' fInsert M.empty invadersPos
   rands0 <- takeCycleGame (length fighters0) 
   rands2 <- takeCycleGame (length fighters0)
   let
@@ -232,10 +230,10 @@ testCollision (Item as ap _) (Item bs bp _) =
     (V2 bx1 by1) = bp + 0.5 * bs
 
 runCollisions :: [Item] -> [Item] -> ([Item], [Item])
-runCollisions [] is = ([], is)
-runCollisions (b:bs) is = (bs1++bs2, is2)
-  where 
-    is1 = filter (not . testCollision b) is
-    bs1 = [b | length is1 == length is]
-    (bs2, is2) = runCollisions bs is1
+runCollisions bs' is' = foldl' up ([], is') bs'
+  where
+    up (bs0, is0) b = 
+      let is1 = filter (not . testCollision b) is0
+          bs1 = [b | length is1 == length is0]
+      in (bs0++bs1, is1)
 

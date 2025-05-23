@@ -163,9 +163,8 @@ handleUpdate (ActionStep t1) = do
   mFpsTime += dt
   mFpsTicks += 1
   fpsTime <- use mFpsTime
-  when (fpsTime > 1) $ do
-    ticks <- use mFpsTicks
-    mFps .= ticks
+  when (fpsTime >= 1) $ do
+    use mFpsTicks >>= assign mFps
     mFpsTime .= 0
     mFpsTicks .= 0
 
