@@ -2,10 +2,10 @@
 
 import Control.Monad
 import Data.Set qualified as S
-import Language.Javascript.JSaddle (JSM, jsg, (#))
+import Language.Javascript.JSaddle (JSM, jsg, (#), JSVal, ToJSVal, new, makeObject)
 import Control.Lens hiding ((#), view)
 import Linear
-import Miso
+import Miso hiding ((<#))
 import Miso.Canvas as Canvas
 import Miso.String qualified as MS
 import Miso.Style qualified as Style
@@ -21,13 +21,11 @@ paddleWidth, paddleHeight :: Double
 paddleWidth = 70
 paddleHeight = 66
 
-paddleImgName :: MS.MisoString
-paddleImgName = "spongebob.png"
-
-idAudioTouched, idAudioWon, idAudioLost :: MS.MisoString
-idAudioTouched = "myAudioTouched" 
-idAudioWon = "myAudioWon" 
-idAudioLost = "myAudioLost" 
+paddleFilename, touchedFilename, wonFilename, lostFilename :: MS.MisoString
+paddleFilename = "spongebob.png"
+touchedFilename = "touched.mp3" 
+wonFilename = "won.mp3" 
+lostFilename = "lost.mp3" 
 
 ----------------------------------------------------------------------
 -- types
@@ -45,6 +43,13 @@ data Action
   = ActionKey (S.Set Int)
   | ActionReset
   | ActionStep Double 
+
+data Resources = Resources
+  { _resImagePaddle :: Image
+  , _resAudioTouched :: Audio
+  , _resAudioWon :: Audio
+  , _resAudioLost :: Audio
+  }
 
 -------------------------------------------------------------------------------
 -- lenses
@@ -74,8 +79,8 @@ mFpsTicks f o = (\x' -> o {_mFpsTicks = x'}) <$> f (_mFpsTicks o)
 -- view handler
 ----------------------------------------------------------------------
 
-handleView :: Image -> Model -> View Action
-handleView paddleImg model = div_ [] 
+handleView :: Resources -> Model -> View Action
+handleView res model = div_ [] 
   [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
   , Canvas.canvas_ 
       [ id_ "mycanvas"
@@ -83,7 +88,7 @@ handleView paddleImg model = div_ []
       , height_ (MS.ms gameHeight)
       , Style.style_  [Style.border "1px solid black"]
       ] 
-      (canvasDraw paddleImg model)
+      (canvasDraw res model)
   , p_ [] [ text ("fps: " <> MS.ms (model^.mFps)) ] 
   , p_ []
        [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"]
@@ -92,22 +97,17 @@ handleView paddleImg model = div_ []
        , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"]
             [ text "demo" ]
        ]
-  , p_ [] 
-      [ audio_ [ id_ idAudioTouched, src_ "touched.mp3" ] []
-      , audio_ [ id_ idAudioWon, src_ "won.mp3" ] []
-      , audio_ [ id_ idAudioLost, src_ "lost.mp3" ] []
-      ]
   ]
 
-canvasDraw :: Image -> Model -> Canvas ()
-canvasDraw paddleImg model = do
+canvasDraw :: Resources -> Model -> Canvas ()
+canvasDraw res model = do
   globalCompositeOperation DestinationOver
   clearRect (0, 0, gameWidthD, gameHeightD)
   case model^.mGame.status of
     Welcome -> drawText "Welcome ! Press Enter to start..."
     Won     -> drawText "You win !"
     Lost    -> drawText "Game over !"
-    Running -> drawGame paddleImg (model^.mGame)
+    Running -> drawGame res (model^.mGame)
 
 drawText :: MS.MisoString -> Canvas ()
 drawText txt = do
@@ -120,26 +120,26 @@ drawItem :: Item -> Canvas ()
 drawItem (Item (V2 sx sy) (V2 px py) _) = 
   fillRect (px-0.5*sx, py-0.5*sy, sx, sy)
 
-drawGame :: Image -> Game -> Canvas ()
-drawGame paddleImg game = do
+drawGame :: Resources -> Game -> Canvas ()
+drawGame res game = do
   fillStyle (color Style.blue)
   mapM_ drawItem (game^.bullets)
   fillStyle (color Style.red)
   mapM_ drawItem (game^.invaders)
   let (V2 px py) = game^.paddle.pos
-  drawImage (paddleImg, px-0.5*paddleWidth, py-0.5*paddleHeight)
+  drawImage (_resImagePaddle res, px-0.5*paddleWidth, py-0.5*paddleHeight)
 
 ----------------------------------------------------------------------
 -- update handler
 ----------------------------------------------------------------------
 
-handleUpdate :: Action -> Effect Model Action
+handleUpdate :: Resources -> Action -> Effect Model Action
 
-handleUpdate ActionReset = do
+handleUpdate _ ActionReset = do
   mGame %= resetGame
   io (ActionStep <$> myGetTime)
 
-handleUpdate (ActionKey keys) = 
+handleUpdate _ (ActionKey keys) = 
   if S.member 13 keys   -- Enter
   then issue ActionReset
   else do
@@ -147,7 +147,7 @@ handleUpdate (ActionKey keys) =
     mGame . inputRight .= S.member 39 keys    -- Right arrow
     mGame . inputFire  .= S.member 32 keys    -- Space
 
-handleUpdate (ActionStep t1) = do
+handleUpdate res (ActionStep t1) = do
   t0 <- use mTime
   let dt = t1 - t0
   mGame %= step dt
@@ -155,10 +155,12 @@ handleUpdate (ActionStep t1) = do
   touched <- uses mGame _hasTouched
   st <- uses mGame _status
   case (st, touched) of
-    (Won, _) -> io_ $ jsPlayAudio idAudioWon
-    (Lost, _) -> io_ $ jsPlayAudio idAudioLost
+    (Won, _) -> io_ $ playAudio (_resAudioWon res)
+    (Lost, _) -> io_ $ playAudio (_resAudioLost res)
     (Running, False) -> io (ActionStep <$> myGetTime)
-    (Running, True) -> io (jsPlayAudio idAudioTouched >> ActionStep <$> myGetTime)
+    (Running, True) -> io $ do
+      playAudio (_resAudioTouched res)
+      ActionStep <$> myGetTime
     _ -> pure ()
   mFpsTime += dt
   mFpsTicks += 1
@@ -172,8 +174,18 @@ handleUpdate (ActionStep t1) = do
 -- JavaScript FFI
 ----------------------------------------------------------------------
 
-jsPlayAudio :: MS.MisoString -> JSM ()
-jsPlayAudio name = void $ jsg name # ("play"::MS.MisoString) $ ()
+newtype Audio = Audio JSVal
+  deriving (ToJSVal)
+
+newAudio :: MS.MisoString -> JSM Audio
+newAudio url = do
+  a <- new (jsg ("Audio" :: MS.MisoString)) ([] :: [MS.MisoString])
+  o <- makeObject a
+  Miso.set "src" url o
+  pure (Audio a)
+
+playAudio :: Audio -> JSM ()
+playAudio (Audio a) = void $ a # ("play"::MS.MisoString) $ ()
 
 ----------------------------------------------------------------------
 -- main
@@ -184,13 +196,18 @@ myGetTime = (* 0.001) <$> now
 
 main :: IO ()
 main = run $ do
-  paddleImg <- newImage paddleImgName
+  res <- Resources 
+          <$> newImage paddleFilename 
+          <*> newAudio touchedFilename
+          <*> newAudio wonFilename
+          <*> newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
   let game = mkGame paddleWidth paddleHeight myRands
+  let model = Model game 0 0 0 0
   startComponent Component
-    { model = Model game 0 0 0 0
-    , update = handleUpdate
-    , view = handleView paddleImg
+    { model = model
+    , update = handleUpdate res
+    , view = handleView res
     , subs = [ keyboardSub ActionKey ]
     , events = defaultEvents
     , styles = []

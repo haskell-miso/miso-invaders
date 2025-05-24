@@ -10,5 +10,5 @@ executable miso-invaders
   default-language:     GHC2021
   ghc-options:          -Wall -no-hs-main -optl-mexec-model=reactor "-optl-Wl,--export=hs_start"
   cpp-options:          -DWASM
-  default-extensions:   CPP TemplateHaskell
+  default-extensions:   CPP TemplateHaskell 
  
