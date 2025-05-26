@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Control.Monad
+import Control.Monad (when)
+import Data.List ((!?))
 import Data.Set qualified as S
-import Language.Javascript.JSaddle (JSM, jsg, (#), JSVal, ToJSVal, new, makeObject)
+import Data.Foldable (traverse_)
+import Language.Javascript.JSaddle (JSM)
 import Control.Lens hiding ((#), view)
 import Linear
 import Miso hiding ((<#))
@@ -11,6 +13,7 @@ import Miso.String qualified as MS
 import Miso.Style qualified as Style
 import System.Random (newStdGen, randoms)
 
+import Audio
 import Game
 
 ----------------------------------------------------------------------
@@ -27,6 +30,13 @@ touchedFilename = "touched.mp3"
 wonFilename = "won.mp3" 
 lostFilename = "lost.mp3" 
 
+playlistFilenames :: [MS.MisoString]
+playlistFilenames =
+  [ "roblox-minecraft-fortnite-video-game-music-299145.mp3"
+  , "kids-game-gaming-background-music-297733.mp3"
+  , "puzzle-game-bright-casual-video-game-music-249202.mp3"
+  ]
+
 ----------------------------------------------------------------------
 -- types
 ----------------------------------------------------------------------
@@ -37,15 +47,18 @@ data Model = Model
   , _mFps :: Int
   , _mFpsTime :: Double
   , _mFpsTicks :: Int
+  , _mIndexPlaylist :: Int
   } deriving (Eq)
 
 data Action 
   = ActionKey (S.Set Int)
   | ActionReset
   | ActionStep Double 
+  | ActionPlaylist Bool
 
 data Resources = Resources
-  { _resImagePaddle :: Image
+  { _resPlaylist :: [Audio]
+  , _resImagePaddle :: Image
   , _resAudioTouched :: Audio
   , _resAudioWon :: Audio
   , _resAudioLost :: Audio
@@ -72,8 +85,9 @@ mFps f o = (\x' -> o {_mFps = x'}) <$> f (_mFps o)
 mFpsTime :: Lens' Model Double
 mFpsTime f o = (\x' -> o {_mFpsTime = x'}) <$> f (_mFpsTime o)
 
-mFpsTicks :: Lens' Model Int
+mFpsTicks, mIndexPlaylist :: Lens' Model Int
 mFpsTicks f o = (\x' -> o {_mFpsTicks = x'}) <$> f (_mFpsTicks o)
+mIndexPlaylist f o = (\x' -> o {_mIndexPlaylist = x'}) <$> f (_mIndexPlaylist o)
 
 ----------------------------------------------------------------------
 -- view handler
@@ -148,6 +162,10 @@ handleUpdate _ (ActionKey keys) =
     mGame . inputFire  .= S.member 32 keys    -- Space
 
 handleUpdate res (ActionStep t1) = do
+  -- update playlist 
+  withPlaylist res $ \audio ->
+    io (ActionPlaylist <$> pausedAudio audio)
+  -- update game
   t0 <- use mTime
   let dt = t1 - t0
   mGame %= step dt
@@ -162,6 +180,7 @@ handleUpdate res (ActionStep t1) = do
       playAudio (_resAudioTouched res)
       ActionStep <$> myGetTime
     _ -> pure ()
+  -- update fps
   mFpsTime += dt
   mFpsTicks += 1
   fpsTime <- use mFpsTime
@@ -170,23 +189,18 @@ handleUpdate res (ActionStep t1) = do
     mFpsTime .= 0
     mFpsTicks .= 0
 
-----------------------------------------------------------------------
--- JavaScript FFI
-----------------------------------------------------------------------
+handleUpdate res (ActionPlaylist paused) = 
+  when paused $ do
+    mIndexPlaylist %= \i -> mod (i+1) (length $ _resPlaylist res)
+    withPlaylist res $ \audio -> do
+      io_ $ setVolumeAudio audio 0.1
+      io_ $ playAudio audio
 
-newtype Audio = Audio JSVal
-  deriving (ToJSVal)
-
-newAudio :: MS.MisoString -> JSM Audio
-newAudio url = do
-  a <- new (jsg ("Audio" :: MS.MisoString)) ([] :: [MS.MisoString])
-  o <- makeObject a
-  Miso.set "src" url o
-  pure (Audio a)
-
-playAudio :: Audio -> JSM ()
-playAudio (Audio a) = void $ a # ("play"::MS.MisoString) $ ()
-
+withPlaylist :: Resources -> (Audio -> Effect Model Action) -> Effect Model Action
+withPlaylist res f = do
+  i <- use mIndexPlaylist
+  traverse_ f $ _resPlaylist res !? i
+  
 ----------------------------------------------------------------------
 -- main
 ----------------------------------------------------------------------
@@ -196,14 +210,15 @@ myGetTime = (* 0.001) <$> now
 
 main :: IO ()
 main = run $ do
-  res <- Resources 
+  playlist <- traverse newAudio playlistFilenames
+  res <- Resources playlist
           <$> newImage paddleFilename 
           <*> newAudio touchedFilename
           <*> newAudio wonFilename
           <*> newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
   let game = mkGame paddleWidth paddleHeight myRands
-  let model = Model game 0 0 0 0
+  let model = Model game 0 0 0 0 0
   startComponent Component
     { model = model
     , update = handleUpdate res
