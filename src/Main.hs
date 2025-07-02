@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Monad (when)
@@ -16,7 +17,6 @@ import System.Random (newStdGen, randoms)
 
 import Audio
 import Game
-import Model
 
 ----------------------------------------------------------------------
 -- global parameters
@@ -42,6 +42,18 @@ playlistFilenames =
 ----------------------------------------------------------------------
 -- types
 ----------------------------------------------------------------------
+
+data Model = Model
+  { _mGame :: Game
+  , _mTime :: Double
+  , _mFps :: Int
+  , _mFpsTime :: Double
+  , _mFpsTicks :: Int
+  , _mIndexPlaylist :: Int
+  } deriving (Eq)
+
+makeLenses ''Model
+
 
 data Action 
   = ActionKey (S.Set Int)
@@ -187,17 +199,13 @@ main = run $ do
   myRands <- take 1000 . randoms <$> newStdGen
   let game = mkGame paddleWidth paddleHeight myRands
   let model = Model game 0 0 0 0 0
-  startComponent Component
-    { model = model
-    , update = handleUpdate res
-    , view = handleView res
-    , subs = [ keyboardSub ActionKey ]
-    , events = defaultEvents
-    , styles = []
-    , mountPoint = Nothing
-    , logLevel = DebugAll
-    , initialAction = Nothing
-    }
+  let app :: Component "app" Model Action
+      app = (defaultComponent model (handleUpdate res) (handleView res))
+              { events = defaultEvents <> mediaEvents
+              , subs = [ keyboardSub ActionKey ]
+              , logLevel = DebugAll
+              }
+  startComponent app
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
