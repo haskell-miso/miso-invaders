@@ -36,6 +36,8 @@ data Item = Item
   , _vel  :: V2 Double
   } deriving (Eq)
 
+makeLenses ''Item
+
 data Game = Game
   { _status       :: Status
   , _hasTouched   :: Bool
@@ -50,45 +52,7 @@ data Game = Game
   , _paddleSize   :: V2 Double
   } deriving (Eq)
 
--------------------------------------------------------------------------------
--- lenses
--- (compile time is much longer with makeLenses)
--------------------------------------------------------------------------------
-
-{-
-makeLenses ''Item
 makeLenses ''Game
--}
-
-siz, pos, vel :: Lens' Item (V2 Double)
-siz f o = (\x' -> o {_siz = x'}) <$> f (_siz o)
-pos f o = (\x' -> o {_pos = x'}) <$> f (_pos o)
-vel f o = (\x' -> o {_vel = x'}) <$> f (_vel o)
-
-status :: Lens' Game Status
-status f o = (\x' -> o {_status = x'}) <$> f (_status o)
-
-hasTouched, inputLeft, inputRight, inputFire :: Lens' Game Bool
-hasTouched f o = (\x' -> o {_hasTouched = x'}) <$> f (_hasTouched o)
-inputLeft f o = (\x' -> o {_inputLeft = x'}) <$> f (_inputLeft o)
-inputRight f o = (\x' -> o {_inputRight = x'}) <$> f (_inputRight o)
-inputFire f o = (\x' -> o {_inputFire = x'}) <$> f (_inputFire o)
-
-rands :: Lens' Game [Double]
-rands f o = (\x' -> o {_rands = x'}) <$> f (_rands o)
-
-fireTime :: Lens' Game Double
-fireTime f o = (\x' -> o {_fireTime = x'}) <$> f (_fireTime o)
-
-paddle :: Lens' Game Item
-paddle f o = (\x' -> o {_paddle = x'}) <$> f (_paddle o)
-
-bullets, invaders :: Lens' Game [Item]
-bullets f o = (\x' -> o {_bullets = x'}) <$> f (_bullets o)
-invaders f o = (\x' -> o {_invaders = x'}) <$> f (_invaders o)
-
-paddleSize :: Lens' Game (V2 Double)
-paddleSize f o = (\x' -> o {_paddleSize = x'}) <$> f (_paddleSize o)
 
 -------------------------------------------------------------------------------
 -- simulate an infinite list

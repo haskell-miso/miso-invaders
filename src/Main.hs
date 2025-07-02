@@ -50,6 +50,8 @@ data Model = Model
   , _mIndexPlaylist :: Int
   } deriving (Eq)
 
+makeLenses ''Model
+
 data Action 
   = ActionKey (S.Set Int)
   | ActionReset
@@ -63,31 +65,6 @@ data Resources = Resources
   , _resAudioWon :: Audio
   , _resAudioLost :: Audio
   }
-
--------------------------------------------------------------------------------
--- lenses
--- (compile time is much longer with makeLenses)
--------------------------------------------------------------------------------
-
-{-
-makeLenses ''Model
--}
-
-mGame :: Lens' Model Game
-mGame f o = (\x' -> o {_mGame = x'}) <$> f (_mGame o)
-
-mTime :: Lens' Model Double
-mTime f o = (\x' -> o {_mTime = x'}) <$> f (_mTime o)
-
-mFps :: Lens' Model Int
-mFps f o = (\x' -> o {_mFps = x'}) <$> f (_mFps o)
-
-mFpsTime :: Lens' Model Double
-mFpsTime f o = (\x' -> o {_mFpsTime = x'}) <$> f (_mFpsTime o)
-
-mFpsTicks, mIndexPlaylist :: Lens' Model Int
-mFpsTicks f o = (\x' -> o {_mFpsTicks = x'}) <$> f (_mFpsTicks o)
-mIndexPlaylist f o = (\x' -> o {_mIndexPlaylist = x'}) <$> f (_mIndexPlaylist o)
 
 ----------------------------------------------------------------------
 -- view handler

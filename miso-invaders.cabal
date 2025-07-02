@@ -8,7 +8,7 @@ executable miso-invaders
   other-modules:        Audio Game
   build-depends:        base, containers, jsaddle, lens, linear, miso, mtl, random
   default-language:     GHC2021
-  ghc-options:          -Wall -no-hs-main -optl-mexec-model=reactor "-optl-Wl,--export=hs_start"
+  ghc-options:          -Wall -no-hs-main -optl-mexec-model=reactor "-optl-Wl,--export=hs_start" -ddump-splices
   cpp-options:          -DWASM
   default-extensions:   CPP TemplateHaskell 
  
