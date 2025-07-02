@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Monad (when)
@@ -196,17 +197,13 @@ main = run $ do
   myRands <- take 1000 . randoms <$> newStdGen
   let game = mkGame paddleWidth paddleHeight myRands
   let model = Model game 0 0 0 0 0
-  startComponent Component
-    { model = model
-    , update = handleUpdate res
-    , view = handleView res
-    , subs = [ keyboardSub ActionKey ]
-    , events = defaultEvents
-    , styles = []
-    , mountPoint = Nothing
-    , logLevel = Off
-    , initialAction = Nothing
-    }
+  let app :: Component "app" Model Action
+      app = (defaultComponent model (handleUpdate res) (handleView res))
+              { events = defaultEvents
+              , subs = [ keyboardSub ActionKey ]
+              , logLevel = DebugAll
+              }
+  startComponent app
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
