@@ -9,12 +9,14 @@ import Control.Lens hiding ((#), view)
 import Linear
 import Miso hiding ((<#))
 import Miso.Canvas as Canvas
+import Miso.Media as Media
 import Miso.String qualified as MS
 import Miso.Style qualified as Style
 import System.Random (newStdGen, randoms)
 
 import Audio
 import Game
+import Model
 
 ----------------------------------------------------------------------
 -- global parameters
@@ -41,17 +43,6 @@ playlistFilenames =
 -- types
 ----------------------------------------------------------------------
 
-data Model = Model
-  { _mGame :: Game
-  , _mTime :: Double
-  , _mFps :: Int
-  , _mFpsTime :: Double
-  , _mFpsTicks :: Int
-  , _mIndexPlaylist :: Int
-  } deriving (Eq)
-
-makeLenses ''Model
-
 data Action 
   = ActionKey (S.Set Int)
   | ActionReset
@@ -59,11 +50,11 @@ data Action
   | ActionPlaylist Bool
 
 data Resources = Resources
-  { _resPlaylist :: [Audio]
+  { _resPlaylist :: [Media]
   , _resImagePaddle :: Image
-  , _resAudioTouched :: Audio
-  , _resAudioWon :: Audio
-  , _resAudioLost :: Audio
+  , _resMediaTouched :: Media
+  , _resMediaWon :: Media
+  , _resMediaLost :: Media
   }
 
 ----------------------------------------------------------------------
@@ -140,8 +131,8 @@ handleUpdate _ (ActionKey keys) =
 
 handleUpdate res (ActionStep t1) = do
   -- update playlist 
-  withPlaylist res $ \audio ->
-    io (ActionPlaylist <$> pausedAudio audio)
+  withPlaylist res $ \media ->
+    io (ActionPlaylist <$> Media.paused media)
   -- update game
   t0 <- use mTime
   let dt = t1 - t0
@@ -150,11 +141,11 @@ handleUpdate res (ActionStep t1) = do
   touched <- uses mGame _hasTouched
   st <- uses mGame _status
   case (st, touched) of
-    (Won, _) -> io_ $ playAudio (_resAudioWon res)
-    (Lost, _) -> io_ $ playAudio (_resAudioLost res)
+    (Won, _) -> io_ $ Media.play (_resMediaWon res)
+    (Lost, _) -> io_ $ Media.play (_resMediaLost res)
     (Running, False) -> io (ActionStep <$> myGetTime)
     (Running, True) -> io $ do
-      playAudio (_resAudioTouched res)
+      Media.play (_resMediaTouched res)
       ActionStep <$> myGetTime
     _ -> pure ()
   -- update fps
@@ -166,14 +157,14 @@ handleUpdate res (ActionStep t1) = do
     mFpsTime .= 0
     mFpsTicks .= 0
 
-handleUpdate res (ActionPlaylist paused) = 
-  when paused $ do
+handleUpdate res (ActionPlaylist isPaused) = 
+  when isPaused $ do
     mIndexPlaylist %= \i -> mod (i+1) (length $ _resPlaylist res)
     withPlaylist res $ \audio -> do
-      io_ $ setVolumeAudio audio 0.1
-      io_ $ playAudio audio
+      io_ $ setVolume audio 0.1
+      io_ $ Media.play audio
 
-withPlaylist :: Resources -> (Audio -> Effect Model Action) -> Effect Model Action
+withPlaylist :: Resources -> (Media -> Effect Model Action) -> Effect Model Action
 withPlaylist res f = do
   i <- use mIndexPlaylist
   traverse_ f $ _resPlaylist res !? i
@@ -187,12 +178,12 @@ myGetTime = (* 0.001) <$> now
 
 main :: IO ()
 main = run $ do
-  playlist <- traverse newAudio playlistFilenames
+  playlist <- traverse Media.new playlistFilenames
   res <- Resources playlist
           <$> newImage paddleFilename 
-          <*> newAudio touchedFilename
-          <*> newAudio wonFilename
-          <*> newAudio lostFilename
+          <*> Media.new touchedFilename
+          <*> Media.new wonFilename
+          <*> Media.new lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
   let game = mkGame paddleWidth paddleHeight myRands
   let model = Model game 0 0 0 0 0
@@ -204,7 +195,7 @@ main = run $ do
     , events = defaultEvents
     , styles = []
     , mountPoint = Nothing
-    , logLevel = Off
+    , logLevel = DebugAll
     , initialAction = Nothing
     }
 
