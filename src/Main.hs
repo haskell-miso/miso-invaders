@@ -17,6 +17,7 @@ import System.Random (newStdGen, randoms)
 
 import Audio
 import Game
+import Model
 
 ----------------------------------------------------------------------
 -- global parameters
@@ -42,18 +43,6 @@ playlistFilenames =
 ----------------------------------------------------------------------
 -- types
 ----------------------------------------------------------------------
-
-data Model = Model
-  { _mGame :: Game
-  , _mTime :: Double
-  , _mFps :: Int
-  , _mFpsTime :: Double
-  , _mFpsTicks :: Int
-  , _mIndexPlaylist :: Int
-  } deriving (Eq)
-
-makeLenses ''Model
-
 
 data Action 
   = ActionKey (S.Set Int)
@@ -173,14 +162,14 @@ handleUpdate res (ActionPlaylist isPaused) =
   when isPaused $ do
     mIndexPlaylist %= \i -> mod (i+1) (length $ _resPlaylist res)
     withPlaylist res $ \audio -> do
-      io_ $ setVolume audio 0.1
+      io_ $ setVolume audio 0.2
       io_ $ Media.play audio
 
 withPlaylist :: Resources -> (Media -> Effect Model Action) -> Effect Model Action
 withPlaylist res f = do
   i <- use mIndexPlaylist
   traverse_ f $ _resPlaylist res !? i
-  
+
 ----------------------------------------------------------------------
 -- main
 ----------------------------------------------------------------------
@@ -190,22 +179,19 @@ myGetTime = (* 0.001) <$> now
 
 main :: IO ()
 main = run $ do
-  playlist <- traverse Media.new playlistFilenames
+  playlist <- traverse Media.newAudio playlistFilenames
   res <- Resources playlist
           <$> newImage paddleFilename 
-          <*> Media.new touchedFilename
-          <*> Media.new wonFilename
-          <*> Media.new lostFilename
+          <*> Media.newAudio touchedFilename
+          <*> Media.newAudio wonFilename
+          <*> Media.newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
-  let game = mkGame paddleWidth paddleHeight myRands
-  let model = Model game 0 0 0 0 0
-  let app :: Component "app" Model Action
-      app = (defaultComponent model (handleUpdate res) (handleView res))
-              { events = defaultEvents <> mediaEvents
-              , subs = [ keyboardSub ActionKey ]
-              , logLevel = DebugAll
-              }
-  startComponent app
+  let model = mkModel $ mkGame paddleWidth paddleHeight myRands
+  startComponent (component model (handleUpdate res) (handleView res))
+    { events = defaultEvents <> mediaEvents
+    , subs = [ keyboardSub ActionKey ]
+    , logLevel = DebugAll
+    }
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
