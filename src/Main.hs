@@ -1,21 +1,20 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Monad (when)
-import Data.List ((!?))
 import Data.Set qualified as S
-import Data.Foldable (traverse_)
 import Language.Javascript.JSaddle (JSM)
 import Control.Lens hiding ((#), view)
 import Linear
 import Miso hiding ((<#))
 import Miso.Canvas as Canvas
+import Miso.Media as Media
 import Miso.String qualified as MS
 import Miso.Style qualified as Style
 import System.Random (newStdGen, randoms)
 
-import Audio
 import Game
+import Model
 
 ----------------------------------------------------------------------
 -- global parameters
@@ -31,40 +30,28 @@ touchedFilename = "touched.mp3"
 wonFilename = "won.mp3" 
 lostFilename = "lost.mp3" 
 
-playlistFilenames :: [MS.MisoString]
-playlistFilenames =
-  [ "roblox-minecraft-fortnite-video-game-music-299145.mp3"
-  , "kids-game-gaming-background-music-297733.mp3"
+playlist :: [MS.MisoString]
+playlist =
+  [ "kids-game-gaming-background-music-297733.mp3"
   , "puzzle-game-bright-casual-video-game-music-249202.mp3"
+  , "roblox-minecraft-fortnite-video-game-music-299145.mp3"
   ]
 
 ----------------------------------------------------------------------
 -- types
 ----------------------------------------------------------------------
 
-data Model = Model
-  { _mGame :: Game
-  , _mTime :: Double
-  , _mFps :: Int
-  , _mFpsTime :: Double
-  , _mFpsTicks :: Int
-  , _mIndexPlaylist :: Int
-  } deriving (Eq)
-
-makeLenses ''Model
-
 data Action 
   = ActionKey (S.Set Int)
   | ActionReset
   | ActionStep Double 
-  | ActionPlaylist Bool
+  | ActionPlaylistNext
 
 data Resources = Resources
-  { _resPlaylist :: [Audio]
-  , _resImagePaddle :: Image
-  , _resAudioTouched :: Audio
-  , _resAudioWon :: Audio
-  , _resAudioLost :: Audio
+  { _resImagePaddle :: Image
+  , _resMediaTouched :: Media
+  , _resMediaWon :: Media
+  , _resMediaLost :: Media
   }
 
 ----------------------------------------------------------------------
@@ -89,7 +76,17 @@ handleView res model = div_ []
        , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"]
             [ text "demo" ]
        ]
+  , audio_ audioAttrs []
   ]
+  where
+    audioAttrs = case model ^. mIndexPlaylist of
+      Nothing -> []
+      Just i -> 
+        [ volume_ 0.2
+        , src_ (playlist !! (i `mod` length playlist))
+        , autoplay_ True
+        , onEnded ActionPlaylistNext
+        ]
 
 canvasDraw :: Resources -> Model -> Canvas ()
 canvasDraw res model = do
@@ -129,6 +126,9 @@ handleUpdate :: Resources -> Action -> Effect Model Action
 
 handleUpdate _ ActionReset = do
   mGame %= resetGame
+  mIndexPlaylist %= \case
+    Nothing -> Just 0
+    Just i -> Just i
   io (ActionStep <$> myGetTime)
 
 handleUpdate _ (ActionKey keys) = 
@@ -140,9 +140,6 @@ handleUpdate _ (ActionKey keys) =
     mGame . inputFire  .= S.member 32 keys    -- Space
 
 handleUpdate res (ActionStep t1) = do
-  -- update playlist 
-  withPlaylist res $ \audio ->
-    io (ActionPlaylist <$> pausedAudio audio)
   -- update game
   t0 <- use mTime
   let dt = t1 - t0
@@ -151,11 +148,11 @@ handleUpdate res (ActionStep t1) = do
   touched <- uses mGame _hasTouched
   st <- uses mGame _status
   case (st, touched) of
-    (Won, _) -> io_ $ playAudio (_resAudioWon res)
-    (Lost, _) -> io_ $ playAudio (_resAudioLost res)
+    (Won, _) -> io_ $ Media.play (_resMediaWon res)
+    (Lost, _) -> io_ $ Media.play (_resMediaLost res)
     (Running, False) -> io (ActionStep <$> myGetTime)
     (Running, True) -> io $ do
-      playAudio (_resAudioTouched res)
+      Media.play (_resMediaTouched res)
       ActionStep <$> myGetTime
     _ -> pure ()
   -- update fps
@@ -167,18 +164,9 @@ handleUpdate res (ActionStep t1) = do
     mFpsTime .= 0
     mFpsTicks .= 0
 
-handleUpdate res (ActionPlaylist paused) = 
-  when paused $ do
-    mIndexPlaylist %= \i -> mod (i+1) (length $ _resPlaylist res)
-    withPlaylist res $ \audio -> do
-      io_ $ setVolumeAudio audio 0.1
-      io_ $ playAudio audio
+handleUpdate _ ActionPlaylistNext = 
+  mIndexPlaylist %= fmap (+1)
 
-withPlaylist :: Resources -> (Audio -> Effect Model Action) -> Effect Model Action
-withPlaylist res f = do
-  i <- use mIndexPlaylist
-  traverse_ f $ _resPlaylist res !? i
-  
 ----------------------------------------------------------------------
 -- main
 ----------------------------------------------------------------------
@@ -188,22 +176,18 @@ myGetTime = (* 0.001) <$> now
 
 main :: IO ()
 main = run $ do
-  playlist <- traverse newAudio playlistFilenames
-  res <- Resources playlist
+  res <- Resources 
           <$> newImage paddleFilename 
-          <*> newAudio touchedFilename
-          <*> newAudio wonFilename
-          <*> newAudio lostFilename
+          <*> Media.newAudio touchedFilename
+          <*> Media.newAudio wonFilename
+          <*> Media.newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
-  let game = mkGame paddleWidth paddleHeight myRands
-  let model = Model game 0 0 0 0 0
-  let app :: Component "app" Model Action
-      app = (defaultComponent model (handleUpdate res) (handleView res))
-              { events = defaultEvents
-              , subs = [ keyboardSub ActionKey ]
-              , logLevel = DebugAll
-              }
-  startComponent app
+  let model = mkModel $ mkGame paddleWidth paddleHeight myRands
+  startComponent (component model (handleUpdate res) (handleView res))
+    { events = defaultEvents <> mediaEvents
+    , subs = [ keyboardSub ActionKey ]
+    , logLevel = DebugAll
+    }
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
