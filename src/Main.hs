@@ -1,10 +1,8 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Monad (when)
-import Data.List ((!?))
 import Data.Set qualified as S
-import Data.Foldable (traverse_)
 import Language.Javascript.JSaddle (JSM)
 import Control.Lens hiding ((#), view)
 import Linear
@@ -15,7 +13,6 @@ import Miso.String qualified as MS
 import Miso.Style qualified as Style
 import System.Random (newStdGen, randoms)
 
-import Audio
 import Game
 import Model
 
@@ -33,11 +30,11 @@ touchedFilename = "touched.mp3"
 wonFilename = "won.mp3" 
 lostFilename = "lost.mp3" 
 
-playlistFilenames :: [MS.MisoString]
-playlistFilenames =
-  [ "roblox-minecraft-fortnite-video-game-music-299145.mp3"
-  , "kids-game-gaming-background-music-297733.mp3"
+playlist :: [MS.MisoString]
+playlist =
+  [ "kids-game-gaming-background-music-297733.mp3"
   , "puzzle-game-bright-casual-video-game-music-249202.mp3"
+  , "roblox-minecraft-fortnite-video-game-music-299145.mp3"
   ]
 
 ----------------------------------------------------------------------
@@ -48,11 +45,10 @@ data Action
   = ActionKey (S.Set Int)
   | ActionReset
   | ActionStep Double 
-  | ActionPlaylist Bool
+  | ActionPlaylistNext
 
 data Resources = Resources
-  { _resPlaylist :: [Media]
-  , _resImagePaddle :: Image
+  { _resImagePaddle :: Image
   , _resMediaTouched :: Media
   , _resMediaWon :: Media
   , _resMediaLost :: Media
@@ -80,7 +76,17 @@ handleView res model = div_ []
        , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"]
             [ text "demo" ]
        ]
+  , audio_ audioAttrs []
   ]
+  where
+    audioAttrs = case model ^. mIndexPlaylist of
+      Nothing -> []
+      Just i -> 
+        [ volume_ 0.2
+        , src_ (playlist !! (i `mod` length playlist))
+        , autoplay_ True
+        , onEnded ActionPlaylistNext
+        ]
 
 canvasDraw :: Resources -> Model -> Canvas ()
 canvasDraw res model = do
@@ -120,6 +126,9 @@ handleUpdate :: Resources -> Action -> Effect Model Action
 
 handleUpdate _ ActionReset = do
   mGame %= resetGame
+  mIndexPlaylist %= \case
+    Nothing -> Just 0
+    Just i -> Just i
   io (ActionStep <$> myGetTime)
 
 handleUpdate _ (ActionKey keys) = 
@@ -131,9 +140,6 @@ handleUpdate _ (ActionKey keys) =
     mGame . inputFire  .= S.member 32 keys    -- Space
 
 handleUpdate res (ActionStep t1) = do
-  -- update playlist 
-  withPlaylist res $ \media ->
-    io (ActionPlaylist <$> Media.paused media)
   -- update game
   t0 <- use mTime
   let dt = t1 - t0
@@ -158,17 +164,8 @@ handleUpdate res (ActionStep t1) = do
     mFpsTime .= 0
     mFpsTicks .= 0
 
-handleUpdate res (ActionPlaylist isPaused) = 
-  when isPaused $ do
-    mIndexPlaylist %= \i -> mod (i+1) (length $ _resPlaylist res)
-    withPlaylist res $ \audio -> do
-      io_ $ setVolume audio 0.2
-      io_ $ Media.play audio
-
-withPlaylist :: Resources -> (Media -> Effect Model Action) -> Effect Model Action
-withPlaylist res f = do
-  i <- use mIndexPlaylist
-  traverse_ f $ _resPlaylist res !? i
+handleUpdate _ ActionPlaylistNext = 
+  mIndexPlaylist %= fmap (+1)
 
 ----------------------------------------------------------------------
 -- main
@@ -179,8 +176,7 @@ myGetTime = (* 0.001) <$> now
 
 main :: IO ()
 main = run $ do
-  playlist <- traverse Media.newAudio playlistFilenames
-  res <- Resources playlist
+  res <- Resources 
           <$> newImage paddleFilename 
           <*> Media.newAudio touchedFilename
           <*> Media.newAudio wonFilename
