@@ -2,8 +2,7 @@
 
 Space-invaders in Haskell, using [Miso](https://github.com/dmjio/miso).
 
-[Play online !](https://juliendehos.gitlab.io/miso-invaders)
-
+[Play online !](https://haskell-miso.github.io/miso-invaders)
 
 ![](doc/miso-invaders.mp4)
 

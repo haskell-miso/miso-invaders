@@ -70,10 +70,10 @@ handleView res model = div_ []
       (canvasDraw res model)
   , p_ [] [ text ("fps: " <> MS.ms (model^.mFps)) ] 
   , p_ []
-       [ a_ [ href_ "https://gitlab.com/juliendehos/miso-invaders"]
+       [ a_ [ href_ "https://github.com/haskell-miso/miso-invaders"]
             [ text "source code" ]
        , text " / "
-       , a_ [ href_ "https://juliendehos.gitlab.io/miso-invaders"]
+       , a_ [ href_ "https://haskell-miso.github.io/miso-invaders"]
             [ text "demo" ]
        ]
   , audio_ audioAttrs []
