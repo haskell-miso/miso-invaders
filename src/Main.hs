@@ -1,10 +1,9 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Monad (when)
 import Data.Set qualified as S
-import Language.Javascript.JSaddle (FromJSVal, ToJSVal, JSM, liftJSM)
+import Language.Javascript.JSaddle (JSM)
 import Control.Lens hiding ((#), view)
 import Linear
 import Miso hiding ((<#))
@@ -13,8 +12,6 @@ import Miso.Media as Media
 import Miso.String qualified as MS
 import Miso.Style qualified as Style
 import System.Random (newStdGen, randoms)
-
-import GHC.Generics
 
 import Game
 import Model
@@ -51,21 +48,19 @@ data Action
   | ActionPlaylistNext
 
 data Resources = Resources
-  { _resMediaTouched :: Media
+  { _resImagePaddle :: Image
+  , _resMediaTouched :: Media
   , _resMediaWon :: Media
   , _resMediaLost :: Media
   }
 
-data CanvasResources = CanvasResources
-  { _crImagePaddle :: Image
-  } deriving (Generic, FromJSVal, ToJSVal)
 
 ----------------------------------------------------------------------
 -- view handler
 ----------------------------------------------------------------------
 
-handleView :: Model -> View Action
-handleView model = div_ [] 
+handleView :: Resources -> Model -> View Action
+handleView res model = div_ [] 
   [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
   , Canvas.canvas 
       [ id_ "mycanvas"
@@ -74,7 +69,7 @@ handleView model = div_ []
       , Style.style_  [Style.border "1px solid black"]
       ] 
       canvasInit
-      (canvasDraw model)
+      (canvasDraw res model)
   , p_ [] [ text ("fps: " <> MS.ms (model^.mFps)) ] 
   , p_ []
        [ a_ [ href_ "https://github.com/haskell-miso/miso-invaders"]
@@ -95,20 +90,18 @@ handleView model = div_ []
         , onEnded ActionPlaylistNext
         ]
 
-canvasInit :: DOMRef -> Canvas CanvasResources
-canvasInit _ = liftJSM $ 
-  CanvasResources
-    <$> newImage paddleFilename 
+canvasInit :: DOMRef -> Canvas ()
+canvasInit _ = pure ()
 
-canvasDraw :: Model -> CanvasResources -> Canvas ()
-canvasDraw model cres = do
+canvasDraw :: Resources -> Model -> () -> Canvas ()
+canvasDraw res model _ = do
   globalCompositeOperation DestinationOver
   clearRect (0, 0, gameWidthD, gameHeightD)
   case model^.mGame.status of
     Welcome -> drawText "Welcome ! Press Enter to start..."
     Won     -> drawText "You win !"
     Lost    -> drawText "Game over !"
-    Running -> drawGame cres (model^.mGame)
+    Running -> drawGame res (model^.mGame)
 
 drawText :: MS.MisoString -> Canvas ()
 drawText txt = do
@@ -121,14 +114,14 @@ drawItem :: Item -> Canvas ()
 drawItem (Item (V2 sx sy) (V2 px py) _) = 
   fillRect (px-0.5*sx, py-0.5*sy, sx, sy)
 
-drawGame :: CanvasResources -> Game -> Canvas ()
-drawGame cres game = do
+drawGame :: Resources -> Game -> Canvas ()
+drawGame res game = do
   fillStyle (color Style.blue)
   mapM_ drawItem (game^.bullets)
   fillStyle (color Style.red)
   mapM_ drawItem (game^.invaders)
   let (V2 px py) = game^.paddle.pos
-  drawImage (_crImagePaddle cres, px-0.5*paddleWidth, py-0.5*paddleHeight)
+  drawImage (_resImagePaddle res, px-0.5*paddleWidth, py-0.5*paddleHeight)
 
 ----------------------------------------------------------------------
 -- update handler
@@ -189,12 +182,13 @@ myGetTime = (* 0.001) <$> now
 main :: IO ()
 main = run $ do
   res <- Resources 
-          <$> Media.newAudio touchedFilename
+          <$> newImage paddleFilename
+          <*> Media.newAudio touchedFilename
           <*> Media.newAudio wonFilename
           <*> Media.newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
   let model = mkModel $ mkGame paddleWidth paddleHeight myRands
-  startComponent (component model (handleUpdate res) handleView)
+  startComponent (component model (handleUpdate res) (handleView res))
     { events = defaultEvents <> mediaEvents
     , subs = [ keyboardSub ActionKey ]
     , logLevel = DebugAll
