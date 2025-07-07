@@ -6,7 +6,8 @@ allow-newer:
 
 source-repository-package
   type: git
-  location: https://github.com/dmjio/miso
+  -- location: https://github.com/dmjio/miso
+  location: https://github.com/juliendehos/miso
   -- branch: master
-  tag: b195bef
+  tag: e9ac997
 
