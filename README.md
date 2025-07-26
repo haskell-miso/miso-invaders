@@ -1,4 +1,4 @@
-# miso-invaders
+# :ramen: 👾 miso-invaders
 
 Space-invaders in Haskell, using [Miso](https://github.com/dmjio/miso).
 
