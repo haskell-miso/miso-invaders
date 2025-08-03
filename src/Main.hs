@@ -1,10 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+import Control.Lens hiding ((#), view)
 import Control.Monad (when)
 import Data.Set qualified as S
 import Language.Javascript.JSaddle (JSM)
-import Control.Lens hiding ((#), view)
 import Linear
 import Miso hiding ((<#))
 import Miso.Canvas as Canvas
@@ -59,7 +59,7 @@ data Resources = Resources
 -- view handler
 ----------------------------------------------------------------------
 
-handleView :: Resources -> Model -> View Action
+handleView :: Resources -> Model -> View Model Action
 handleView res model = div_ [] 
   [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
   , Canvas.canvas 
@@ -127,7 +127,7 @@ drawGame res game = do
 -- update handler
 ----------------------------------------------------------------------
 
-handleUpdate :: Resources -> Action -> Effect Model Action
+handleUpdate :: Resources -> Action -> Transition Model Action
 
 handleUpdate _ ActionReset = do
   mGame %= resetGame
@@ -188,7 +188,7 @@ main = run $ do
           <*> Media.newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
   let model = mkModel $ mkGame paddleWidth paddleHeight myRands
-  startComponent (component model (handleUpdate res) (handleView res))
+  startApp (component model (handleUpdate res) (handleView res))
     { events = defaultEvents <> mediaEvents
     , subs = [ keyboardSub ActionKey ]
     , logLevel = DebugAll

@@ -1,4 +1,3 @@
-
 module Model where
 
 import Control.Lens
