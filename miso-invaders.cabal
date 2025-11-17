@@ -2,6 +2,10 @@ cabal-version:          3.0
 name:                   miso-invaders
 version:                0.2
 
+common options
+  ghc-options:
+    -funbox-strict-fields -O2 -ferror-spans -fspecialise-aggressively -Wall
+
 common wasm
   if arch(wasm32)
     ghc-options:
@@ -10,12 +14,18 @@ common wasm
       -DWASM
 
 executable miso-invaders
-  imports: wasm           
+  import:
+    wasm, options           
   hs-source-dirs:
     src
-  main-is:              Main.hs
-  other-modules:        Audio Game
-  build-depends:        base, containers, jsaddle, lens, linear, miso, mtl, random
-  default-language:     GHC2021
-  default-extensions:   CPP TemplateHaskell 
-
+  main-is:
+    Main.hs
+  other-modules:
+    Game Model
+  build-depends:
+    base, containers, jsaddle, lens, linear, miso, mtl, random
+  default-language:
+    GHC2021
+  default-extensions:
+    CPP TemplateHaskell 
+ 
