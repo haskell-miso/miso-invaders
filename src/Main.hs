@@ -3,14 +3,20 @@
 
 import Control.Lens hiding ((#), view)
 import Control.Monad (when)
-import Data.Set qualified as S
+import Data.List ((!?), foldl')
+import Data.IntSet qualified as S
+import Data.Foldable (traverse_)
 import Language.Javascript.JSaddle (JSM)
+import Control.Monad.State
+import Control.Lens hiding ((#), view)
 import Linear
-import Miso hiding ((<#))
+import Miso hiding ((<#), status)
+import Miso.Html
+import Miso.Html.Property
 import Miso.Canvas as Canvas
 import Miso.Media as Media
 import Miso.String qualified as MS
-import Miso.Style qualified as Style
+import Miso.CSS qualified as CSS
 import System.Random (newStdGen, randoms)
 
 import Game
@@ -42,7 +48,7 @@ playlist =
 ----------------------------------------------------------------------
 
 data Action 
-  = ActionKey (S.Set Int)
+  = ActionKey S.IntSet
   | ActionReset
   | ActionStep Double 
   | ActionPlaylistNext
@@ -62,13 +68,13 @@ data Resources = Resources
 handleView :: Resources -> Model -> View Model Action
 handleView res model = div_ [] 
   [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
-  , Canvas.canvas 
+  , Canvas.canvas
       [ id_ "mycanvas"
       , width_ (MS.ms gameWidth)
       , height_ (MS.ms gameHeight)
-      , Style.style_  [Style.border "1px solid black"]
-      ] 
-      canvasInit
+      , CSS.style_  [CSS.border "1px solid black"]
+      ]
+      pure
       (canvasDraw res model)
   , p_ [] [ text ("fps: " <> MS.ms (model^.mFps)) ] 
   , p_ []
@@ -80,20 +86,8 @@ handleView res model = div_ []
        ]
   , audio_ audioAttrs []
   ]
-  where
-    audioAttrs = case model ^. mIndexPlaylist of
-      Nothing -> []
-      Just i -> 
-        [ volume_ 0.2
-        , src_ (playlist !! (i `mod` length playlist))
-        , autoplay_ True
-        , onEnded ActionPlaylistNext
-        ]
 
-canvasInit :: DOMRef -> Canvas ()
-canvasInit _ = pure ()
-
-canvasDraw :: Resources -> Model -> () -> Canvas ()
+canvasDraw :: Resources -> Model -> DOMRef -> Canvas ()
 canvasDraw res model _ = do
   globalCompositeOperation DestinationOver
   clearRect (0, 0, gameWidthD, gameHeightD)
@@ -105,7 +99,7 @@ canvasDraw res model _ = do
 
 drawText :: MS.MisoString -> Canvas ()
 drawText txt = do
-  fillStyle (color Style.black)
+  fillStyle (color CSS.black)
   textAlign TextAlignCenter
   font "40px Arial"
   fillText (txt, 0.5*gameWidthD, 0.5*gameHeightD)
@@ -116,9 +110,9 @@ drawItem (Item (V2 sx sy) (V2 px py) _) =
 
 drawGame :: Resources -> Game -> Canvas ()
 drawGame res game = do
-  fillStyle (color Style.blue)
+  fillStyle (color CSS.blue)
   mapM_ drawItem (game^.bullets)
-  fillStyle (color Style.red)
+  fillStyle (color CSS.red)
   mapM_ drawItem (game^.invaders)
   let (V2 px py) = game^.paddle.pos
   drawImage (_resImagePaddle res, px-0.5*paddleWidth, py-0.5*paddleHeight)
@@ -169,9 +163,18 @@ handleUpdate res (ActionStep t1) = do
     mFpsTime .= 0
     mFpsTicks .= 0
 
-handleUpdate _ ActionPlaylistNext = 
-  mIndexPlaylist %= fmap (+1)
+handleUpdate res (ActionPlaylist paused) = 
+  when paused $ do
+    mIndexPlaylist %= \i -> mod (i+1) (length $ _resPlaylist res)
+    withPlaylist res $ \audio -> do
+      io_ $ setVolumeAudio audio 0.1
+      io_ $ playAudio audio
 
+withPlaylist :: Resources -> (Audio -> Transition Model Action) -> Transition Model Action
+withPlaylist res f = do
+  i <- use mIndexPlaylist
+  traverse_ f $ _resPlaylist res !? i
+  
 ----------------------------------------------------------------------
 -- main
 ----------------------------------------------------------------------
@@ -187,11 +190,10 @@ main = run $ do
           <*> Media.newAudio wonFilename
           <*> Media.newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
-  let model = mkModel $ mkGame paddleWidth paddleHeight myRands
-  startApp (component model (handleUpdate res) (handleView res))
-    { events = defaultEvents <> mediaEvents
-    , subs = [ keyboardSub ActionKey ]
-    , logLevel = DebugAll
+  let game = mkGame paddleWidth paddleHeight myRands
+  let model = Model game 0 0 0 0 0
+  startComponent $ (component model (handleUpdate res) (handleView res))
+    { subs = [ keyboardSub ActionKey ]
     }
 
 #ifdef WASM
