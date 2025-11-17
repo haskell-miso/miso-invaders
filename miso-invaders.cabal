@@ -2,13 +2,20 @@ cabal-version:          3.0
 name:                   miso-invaders
 version:                0.2
 
+common wasm
+  if arch(wasm32)
+    ghc-options:
+      -no-hs-main -optl-mexec-model=reactor "-optl-Wl,--export=hs_start"
+    cpp-options:
+      -DWASM
+
 executable miso-invaders
-  hs-source-dirs:       src
+  imports: wasm           
+  hs-source-dirs:
+    src
   main-is:              Main.hs
   other-modules:        Audio Game
   build-depends:        base, containers, jsaddle, lens, linear, miso, mtl, random
   default-language:     GHC2021
-  ghc-options:          -Wall -no-hs-main -optl-mexec-model=reactor "-optl-Wl,--export=hs_start"
-  cpp-options:          -DWASM
   default-extensions:   CPP TemplateHaskell 
- 
+

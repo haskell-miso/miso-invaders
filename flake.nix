@@ -1,18 +1,14 @@
 {
-  inputs = {
-    ghc-wasm-meta.url = "gitlab:haskell-wasm/ghc-wasm-meta?host=gitlab.haskell.org";
-  };
-  outputs = inputs: inputs.ghc-wasm-meta.inputs.flake-utils.lib.eachDefaultSystem (system:
-    let pkgs = inputs.ghc-wasm-meta.inputs.nixpkgs.legacyPackages.${system};
-    in
-    {
-      devShells.default = pkgs.mkShell {
-        packages = [
-          inputs.ghc-wasm-meta.packages.${system}.all_9_12
-          pkgs.gnumake
-          pkgs.http-server
-        ];
-      };
-    });
-  }
 
+  inputs = {
+    miso.url = "github:dmjio/miso";
+  };
+
+  outputs = inputs:
+    inputs.miso.inputs.flake-utils.lib.eachDefaultSystem (system: {
+      devShell = inputs.miso.outputs.devShells.${system}.default;
+      devShells.wasm = inputs.miso.outputs.devShells.${system}.wasm;
+      devShells.ghcjs = inputs.miso.outputs.devShells.${system}.ghcjs;
+    });
+
+}

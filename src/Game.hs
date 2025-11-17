@@ -3,7 +3,7 @@ module Game where
 import Control.Lens
 import Control.Monad.State
 import Data.Bool (bool)
-import Data.List (singleton)
+import Data.List (singleton, foldl')
 import Data.Map qualified as M
 import Linear
 
