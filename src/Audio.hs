@@ -4,8 +4,7 @@ module Audio where
 
 import Control.Monad (void)
 import Data.Maybe (fromMaybe)
-import Language.Javascript.JSaddle -- (JSM, jsg, (#), JSVal, ToJSVal, new, makeObject, fromJSVal, (!))
-import Miso hiding ((<#))
+import Miso
 import Miso.String qualified as MS
 
 ----------------------------------------------------------------------
@@ -15,20 +14,20 @@ import Miso.String qualified as MS
 newtype Audio = Audio JSVal
   deriving (ToJSVal)
 
-newAudio :: MS.MisoString -> JSM Audio
+newAudio :: MS.MisoString -> IO Audio
 newAudio url = do
   a <- new (jsg ("Audio" :: MS.MisoString)) ([] :: [MS.MisoString])
-  o <- makeObject a
+  o <- toObject a
   Miso.set "src" url o
   pure (Audio a)
 
-playAudio :: Audio -> JSM ()
+playAudio :: Audio -> IO ()
 playAudio (Audio a) = void $ a # ("play"::MS.MisoString) $ ()
 
-setVolumeAudio :: Audio -> Double -> JSM ()
-setVolumeAudio (Audio a) = a <# ("volume"::MS.MisoString) 
+setVolumeAudio :: Audio -> Double -> IO ()
+setVolumeAudio (Audio a) = setField a ("volume"::MS.MisoString) 
 
-pausedAudio :: Audio -> JSM Bool
+pausedAudio :: Audio -> IO Bool
 pausedAudio (Audio a) = do
   value <- a ! ("paused"::MS.MisoString)
   fromMaybe False <$> fromJSVal value

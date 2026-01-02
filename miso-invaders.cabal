@@ -10,12 +10,12 @@ common wasm
       -DWASM
 
 executable miso-invaders
-  imports: wasm           
+  import: wasm           
   hs-source-dirs:
     src
   main-is:              Main.hs
   other-modules:        Audio Game
-  build-depends:        base, containers, jsaddle, lens, linear, miso, mtl, random
+  build-depends:        base, containers, lens, linear, miso, mtl, random
   default-language:     GHC2021
   default-extensions:   CPP TemplateHaskell 
 

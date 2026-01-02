@@ -4,7 +4,6 @@ import Control.Monad (when)
 import Data.List ((!?), foldl')
 import Data.IntSet qualified as S
 import Data.Foldable (traverse_)
-import Language.Javascript.JSaddle (JSM)
 import Control.Monad.State
 import Control.Lens hiding ((#), view)
 import Linear
@@ -209,7 +208,7 @@ withPlaylist res f = do
 -- main
 ----------------------------------------------------------------------
 
-myGetTime :: JSM Double
+myGetTime :: IO Double
 myGetTime = (* 0.001) <$> now
 
 main :: IO ()
