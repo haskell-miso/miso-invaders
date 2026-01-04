@@ -3,14 +3,15 @@
 
 import Control.Lens hiding ((#), view)
 import Control.Monad (when)
-import Data.Set qualified as S
-import Language.Javascript.JSaddle (JSM)
+import Data.IntSet qualified as S
 import Linear
-import Miso hiding ((<#))
+import Miso.Html.Property
+import Miso.Html
+import Miso hiding ((<#), status, (!!))
 import Miso.Canvas as Canvas
 import Miso.Media as Media
 import Miso.String qualified as MS
-import Miso.Style qualified as Style
+import Miso.CSS qualified as Style
 import System.Random (newStdGen, randoms)
 
 import Game
@@ -42,7 +43,7 @@ playlist =
 ----------------------------------------------------------------------
 
 data Action 
-  = ActionKey (S.Set Int)
+  = ActionKey S.IntSet
   | ActionReset
   | ActionStep Double 
   | ActionPlaylistNext
@@ -58,7 +59,6 @@ data Resources = Resources
 ----------------------------------------------------------------------
 -- view handler
 ----------------------------------------------------------------------
-
 handleView :: Resources -> Model -> View Model Action
 handleView res model = div_ [] 
   [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
@@ -176,16 +176,27 @@ handleUpdate _ ActionPlaylistNext =
 -- main
 ----------------------------------------------------------------------
 
-myGetTime :: JSM Double
+myGetTime :: IO Double
 myGetTime = (* 0.001) <$> now
+
+-----------------------------------------------------------------------------
+
+-- | Smart constructor for an audio @Media@ with 'src' element
+
+newAudio :: MisoString -> IO Media
+newAudio url = do
+  a <- new (jsg "Audio") ([] :: [MisoString])
+  o <- toObject a
+  Miso.set ("src" :: MisoString) url o
+  pure (Media a)
 
 main :: IO ()
 main = run $ do
   res <- Resources 
           <$> newImage paddleFilename
-          <*> Media.newAudio touchedFilename
-          <*> Media.newAudio wonFilename
-          <*> Media.newAudio lostFilename
+          <*> newAudio touchedFilename
+          <*> newAudio wonFilename
+          <*> newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
   let model = mkModel $ mkGame paddleWidth paddleHeight myRands
   startApp (component model (handleUpdate res) (handleView res))

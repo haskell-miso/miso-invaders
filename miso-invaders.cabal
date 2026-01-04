@@ -23,7 +23,7 @@ executable miso-invaders
   other-modules:
     Game Model
   build-depends:
-    base, containers, jsaddle, lens, linear, miso, mtl, random
+    base, containers, lens, linear, miso, mtl, random
   default-language:
     GHC2021
   default-extensions:
