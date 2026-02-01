@@ -7,7 +7,7 @@ import Data.IntSet qualified as S
 import Linear
 import Miso.Html.Property
 import Miso.Html
-import Miso hiding ((<#), status, (!!))
+import Miso hiding ((<#), status, (!!), newStdGen)
 import Miso.Canvas as Canvas
 import Miso.Media as Media
 import Miso.String qualified as MS
@@ -191,7 +191,7 @@ newAudio url = do
   pure (Media a)
 
 main :: IO ()
-main = run $ do
+main = do
   res <- Resources 
           <$> newImage paddleFilename
           <*> newAudio touchedFilename
@@ -199,11 +199,11 @@ main = run $ do
           <*> newAudio lostFilename
   myRands <- take 1000 . randoms <$> newStdGen
   let model = mkModel $ mkGame paddleWidth paddleHeight myRands
-  startApp (component model (handleUpdate res) (handleView res))
-    { events = defaultEvents <> mediaEvents
-    , subs = [ keyboardSub ActionKey ]
-    , logLevel = DebugAll
-    }
+  startApp (defaultEvents <> mediaEvents)
+    (component model (handleUpdate res) (handleView res))
+      { subs = [ keyboardSub ActionKey ]
+      , logLevel = DebugAll
+      }
 
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
