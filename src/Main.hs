@@ -127,7 +127,7 @@ drawGame res game = do
 -- update handler
 ----------------------------------------------------------------------
 
-handleUpdate :: Resources -> Action -> Transition Model Action
+handleUpdate :: Resources -> Action -> Effect parent Model Action
 
 handleUpdate _ ActionReset = do
   mGame %= resetGame
