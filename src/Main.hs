@@ -60,7 +60,7 @@ data Resources = Resources
 -- view handler
 ----------------------------------------------------------------------
 handleView :: Resources -> Model -> View Model Action
-handleView res model = div_ [] 
+handleView res model = vfrag
   [ p_ [] [ "Usage: left/right to move, space to fire and enter to start..." ]
   , Canvas.canvas 
       [ id_ "mycanvas"
@@ -208,4 +208,3 @@ main = do
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
 #endif
-
